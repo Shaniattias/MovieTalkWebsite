@@ -4,9 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
 
+
+
 import { GoogleButton } from "../components/ui/GoogleButton";
 import { LoginForm } from "../components/ui/LoginForm";
 import { authApi } from "../lib/auth";
+import { useAuth } from "../context/AuthContext";
+
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -20,6 +24,8 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+    const { loginMock } = useAuth();
+
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -27,21 +33,19 @@ export default function Login() {
   });
 
   const onSubmit = async (data: LoginFormValues) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const result = await authApi.login(data);
-      if (result.success) {
-        navigate("/register"); // תשני בהמשך לדף הבית
-      } else {
-        setError("Invalid email or password. Please try again.");
-      }
-    } catch {
-      setError("Invalid email or password. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  setIsLoading(true);
+  setError(null);
+
+  try {
+    loginMock(data.email);   
+    navigate("/Home");     
+  } catch {
+    setError("Login failed. Please try again.");
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true);
@@ -75,6 +79,7 @@ export default function Login() {
 
       <div className="relative z-10 w-full max-w-md">
         <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
+
           <div className="flex flex-col items-center mb-8">
             <img
               src="/images/logo.png"
