@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Search, Plus, Heart, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-
 type FeedPost = {
   id: string;
   author: string;
@@ -18,10 +17,8 @@ type FeedPost = {
 
 export default function Home() {
   const navigate = useNavigate();
-
   const [query, setQuery] = useState("");
 
-  
   const posts: FeedPost[] = useMemo(
     () => [
       {
@@ -72,29 +69,28 @@ export default function Home() {
 
   return (
     <div className="min-h-screen relative text-white">
-    
       <div
         className="absolute inset-0 bg-cover bg-center"
         style={{
           backgroundImage: "url('/images/movie-collage-bg.jpg')",
         }}
       />
-    
       <div className="absolute inset-0 bg-black/75" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.06),rgba(0,0,0,0.85))]" />
 
-  
       <div className="relative z-10">
-      
-        <header className="sticky top-0 z-20 border-b border-white/10 bg-black/35 backdrop-blur-xl">
-          <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-3">
-          <div className="flex items-center">
-  <img
-    src="/images/logo2.png"
-    alt="MovieTalk"
-    className="h-10 md:h-12 w-auto object-contain"
-  />
-</div>
+    <header className="sticky top-0 z-20 h-16 border-b border-white/10 bg-black/35 backdrop-blur-xl">
+
+         <div className="relative mx-auto max-w-6xl px-4 h-full flex items-center">
+
+            <div className="flex items-center">
+             <img
+  src="/images/logo2.png"
+  alt="MovieTalk"
+  className="absolute left-4 top-1/2 h-20 w-auto -translate-y-1/2 object-contain"
+/>
+
+            </div>
 
             <div className="flex-1" />
 
@@ -108,13 +104,15 @@ export default function Home() {
               />
             </div>
 
-            <button className="ml-1 inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-black/30 hover:opacity-95 active:opacity-90">
+            <button
+              onClick={() => navigate("/create")}
+              className="ml-1 inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-black/30 hover:opacity-95 active:opacity-90"
+            >
               <Plus className="h-4 w-4" />
               Create
             </button>
           </div>
 
-      
           <div className="md:hidden px-4 pb-3">
             <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 backdrop-blur">
               <Search className="h-4 w-4 opacity-80" />
@@ -128,12 +126,9 @@ export default function Home() {
           </div>
         </header>
 
-
         <main className="mx-auto max-w-6xl px-4 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
-        
             <section className="space-y-4">
-             
               <div className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl px-5 py-4 shadow-xl shadow-black/20">
                 <div className="text-lg font-semibold">Your Feed</div>
                 <div className="text-sm text-white/70">
@@ -144,7 +139,8 @@ export default function Home() {
               {filtered.map((p) => (
                 <article
                   key={p.id}
-                  className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-5 shadow-xl shadow-black/20"
+                  onClick={() => navigate(`/post/${p.id}`)}
+                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-5 shadow-xl shadow-black/20 hover:bg-white/15 transition"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -157,20 +153,20 @@ export default function Home() {
                       </div>
                     </div>
 
-                   <button
-  onClick={() => navigate("/profile")}
-  className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
->
-  My profile
-</button>
-
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate("/profile");
+                      }}
+                      className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
+                    >
+                      My profile
+                    </button>
                   </div>
 
                   <div className="mt-4">
                     <div className="text-base font-semibold">{p.title}</div>
-                    <p className="mt-1 text-sm text-white/80 leading-6">
-                      {p.text}
-                    </p>
+                    <p className="mt-1 text-sm text-white/80 leading-6">{p.text}</p>
                   </div>
 
                   {p.poster ? (
@@ -185,7 +181,14 @@ export default function Home() {
 
                   <div className="mt-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <button className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-2 text-sm hover:bg-black/30">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // TODO: like mock
+                          console.log("like", p.id);
+                        }}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-2 text-sm hover:bg-black/30"
+                      >
                         <Heart
                           className={`h-4 w-4 ${
                             p.liked ? "text-primary" : "text-white/80"
@@ -194,7 +197,14 @@ export default function Home() {
                         <span className="text-white/90">{p.likesCount}</span>
                       </button>
 
-                      <button className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-2 text-sm hover:bg-black/30">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // TODO: comments page later
+                          console.log("comments", p.id);
+                        }}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-2 text-sm hover:bg-black/30"
+                      >
                         <MessageCircle className="h-4 w-4 text-white/80" />
                         <span className="text-white/90">{p.commentsCount}</span>
                         <span className="text-white/60 hidden sm:inline">
@@ -203,15 +213,12 @@ export default function Home() {
                       </button>
                     </div>
 
-                    <button className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15">
-                      Open post
-                    </button>
+                    {/* הסרנו את Open post — כל הפוסט כבר לחיץ */}
                   </div>
                 </article>
               ))}
             </section>
 
-      
             <aside className="space-y-4">
               <div className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-5 shadow-xl shadow-black/20">
                 <div className="font-semibold">Trending</div>
@@ -234,15 +241,19 @@ export default function Home() {
               <div className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-5 shadow-xl shadow-black/20">
                 <div className="font-semibold">Quick actions</div>
                 <div className="mt-3 grid grid-cols-1 gap-2">
-                  <button className="rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-95">
+                  <button
+                    onClick={() => navigate("/create")}
+                    className="rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-95"
+                  >
                     Create a post
                   </button>
+
                   <button
-  onClick={() => navigate("/profile")}
-  className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
->
-  My profile
-</button>
+                    onClick={() => navigate("/profile")}
+                    className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
+                  >
+                    My profile
+                  </button>
 
                   <button className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15">
                     Saved posts
