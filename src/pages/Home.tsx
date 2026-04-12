@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Plus, MessageCircle, UserRound} from "lucide-react";
+import { Search, Plus, Heart, MessageCircle, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getAllPosts, type Post } from "../lib/posts";
+import { getAllPosts, toggleLike, type Post } from "../lib/posts";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -14,6 +14,12 @@ export default function Home() {
     if (!user) return;
     setPosts(getAllPosts(user));
   }, [user]);
+
+  const handleToggleLike = (postId: string) => {
+    const updated = toggleLike(postId);
+    if (!updated) return;
+    setPosts((prev) => prev.map((p) => (p.id === postId ? updated : p)));
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -124,6 +130,21 @@ export default function Home() {
 
                   <div className="mt-5 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleLike(p.id);
+                        }}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-black/25 px-4 py-2 text-sm hover:bg-black/35 transition"
+                      >
+                        <Heart
+                          className={`h-4 w-4 ${
+                            p.liked ? "fill-current text-primary" : "text-white/80"
+                          }`}
+                        />
+                        <span className="text-white/90">{p.likesCount}</span>
+                      </button>
+
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
