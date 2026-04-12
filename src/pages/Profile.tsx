@@ -39,8 +39,16 @@ export default function Profile() {
         <div className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-8 shadow-2xl">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
       
-            <div className="h-32 w-32 rounded-full bg-white/20 border border-white/20 flex items-center justify-center text-4xl font-bold">
-              {user?.email?.[0]?.toUpperCase() || "U"}
+            <div className="h-32 w-32 overflow-hidden rounded-full bg-white/20 border border-white/20 flex items-center justify-center text-4xl font-bold">
+              {user?.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt="Profile"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                user?.email?.[0]?.toUpperCase() || "U"
+              )}
             </div>
 
             <div className="flex-1">
@@ -50,7 +58,10 @@ export default function Profile() {
               <p className="mt-2 text-white/70">{user?.email}</p>
 
               <div className="mt-6 flex flex-wrap gap-3">
-                <button className="inline-flex items-center gap-2 rounded-2xl bg-gray-500/30 border border-gray-300/30 px-5 py-2 text-sm font-semibold text-white hover:bg-gray-500/40">
+                <button
+                  onClick={() => navigate("/profile/edit")}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-gray-500/30 border border-gray-300/30 px-5 py-2 text-sm font-semibold text-white hover:bg-gray-500/40"
+                >
                   <UserPen className="h-4 w-4" />
                   Edit profile
                 </button>
