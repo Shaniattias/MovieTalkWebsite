@@ -73,12 +73,21 @@ export default function PostDetails() {
             <h1 className="text-2xl md:text-3xl font-bold">Post details</h1>
           </div>
 
-          <button
-            onClick={() => navigate("/home")}
-            className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
-          >
-            Back
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate(`/post/${id}/edit`)}
+              className="rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-95"
+            >
+              Edit
+            </button>
+
+            <button
+              onClick={() => navigate("/home")}
+              className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
+            >
+              Back
+            </button>
+          </div>
         </div>
 
         {!post ? (

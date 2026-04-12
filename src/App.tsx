@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import CreatePost from "./pages/CreatePost";
+import EditPost from "./pages/EditPost";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import PostDetails from "./pages/PostDetails";
@@ -36,6 +37,7 @@ export default function App() {
         <Route path="/profile" element={<Protected> <Profile /> </Protected>}/>
         <Route path="/profile/edit" element={<Protected><EditProfile /></Protected>} />
         <Route path="/create" element={<Protected><CreatePost /></Protected> }/>
+        <Route path="/post/:id/edit" element={<Protected><EditPost /></Protected>} />
         <Route path="/post/:id"element={<Protected><PostDetails /></Protected> }/>
         <Route path="/post/:id/comments" element={<Protected><Comments/></Protected>} />
 
