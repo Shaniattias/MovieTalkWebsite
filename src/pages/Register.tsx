@@ -50,7 +50,7 @@ export default function Register() {
         password: data.password,
       });
       if (result.success) {
-        loginMock(data.email);
+        loginMock(data.email, data.name);
         navigate("/home");
       } else setError("Registration failed. Please try again.");
     } catch {

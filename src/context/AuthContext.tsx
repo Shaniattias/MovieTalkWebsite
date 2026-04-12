@@ -1,13 +1,14 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
 
 export type AuthUser = {
+  name?: string;
   email: string;
 };
 
 type AuthContextValue = {
   user: AuthUser | null;
   isAuthenticated: boolean;
-  loginMock: (email: string) => void;
+  loginMock: (email: string, name?: string) => void;
   logout: () => void;
 };
 
@@ -21,8 +22,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return raw ? (JSON.parse(raw) as AuthUser) : null;
   });
 
-  const loginMock = (email: string) => {
-    const u: AuthUser = { email };
+  const loginMock = (email: string, name?: string) => {
+    const u: AuthUser = { email, name };
     setUser(u);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
   };
