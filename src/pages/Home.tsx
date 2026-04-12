@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Plus, MessageCircle, UserRound } from "lucide-react";
+import { Search, Plus, MessageCircle, UserRound} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getAllPosts, type Post } from "../lib/posts";
@@ -14,8 +14,6 @@ export default function Home() {
     if (!user) return;
     setPosts(getAllPosts(user));
   }, [user]);
-
-
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
