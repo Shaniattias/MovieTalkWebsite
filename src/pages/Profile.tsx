@@ -47,7 +47,7 @@ export default function Profile() {
                   className="h-full w-full object-cover"
                 />
               ) : (
-                user?.email?.[0]?.toUpperCase() || "U"
+                user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U"
               )}
             </div>
 
