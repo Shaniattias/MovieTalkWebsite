@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, Plus, Heart, MessageCircle } from "lucide-react";
+import { Search, Plus, Heart, MessageCircle, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 type FeedPost = {
@@ -70,124 +70,105 @@ export default function Home() {
   return (
     <div className="min-h-screen relative text-white">
       <div
-        className="absolute inset-0 bg-cover bg-center"
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
         style={{
           backgroundImage: "url('/images/movie-collage-bg.jpg')",
+          backgroundAttachment: "fixed",
         }}
       />
-      <div className="absolute inset-0 bg-black/75" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.06),rgba(0,0,0,0.85))]" />
+      <div className="fixed inset-0 bg-black/75" />
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.06),rgba(0,0,0,0.85))]" />
 
       <div className="relative z-10">
-    <header className="sticky top-0 z-20 h-16 border-b border-white/10 bg-black/35 backdrop-blur-xl">
-
-         <div className="relative mx-auto max-w-6xl px-4 h-full flex items-center">
-
-            <div className="flex items-center">
-             <img
-  src="/images/logo2.png"
-  alt="MovieTalk"
-  className="absolute left-4 top-1/2 h-20 w-auto -translate-y-1/2 object-contain"
-/>
-
+        <header className="sticky top-0 z-20 h-16 border-b border-white/10 bg-black/35 backdrop-blur-xl">
+          <div className="relative mx-auto flex h-full max-w-6xl items-center justify-between px-4">
+            <div className="z-10 flex items-center">
+              <img
+                src="/images/logo2.png"
+                alt="MovieTalk"
+                className="h-16 w-35 object-contain"
+              />
             </div>
 
-            <div className="flex-1" />
-
-            <div className="hidden md:flex w-[420px] max-w-full items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 backdrop-blur">
+            <div className="absolute left-1/2 top-1/2 z-0 flex w-[min(44vw,420px)] min-w-[170px] -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 backdrop-blur">
               <Search className="h-4 w-4 opacity-80" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search posts, users, topics…"
+                placeholder="Search posts, users, topics..."
                 className="w-full bg-transparent outline-none placeholder:text-white/60 text-sm"
               />
             </div>
 
-            <button
-              onClick={() => navigate("/create")}
-              className="ml-1 inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-black/30 hover:opacity-95 active:opacity-90"
-            >
-              <Plus className="h-4 w-4" />
-              Create
-            </button>
-          </div>
+            <div className="z-10 flex items-center justify-end gap-2">
+              <button
+                onClick={() => navigate("/create")}
+                className="inline-flex items-center gap-2 rounded-2xl bg-red-600 hover:bg-red-800 px-3 sm:px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-black/30 active:opacity-90"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Create</span>
+              </button>
 
-          <div className="md:hidden px-4 pb-3">
-            <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 backdrop-blur">
-              <Search className="h-4 w-4 opacity-80" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search…"
-                className="w-full bg-transparent outline-none placeholder:text-white/60 text-sm"
-              />
+              <button
+                onClick={() => navigate("/profile")}
+                aria-label="Go to profile"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/10 hover:bg-white/20 transition"
+              >
+                <UserRound className="h-5 w-5 text-white/90" />
+              </button>
             </div>
           </div>
         </header>
 
-        <main className="mx-auto max-w-6xl px-4 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
-            <section className="space-y-4">
-              <div className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl px-5 py-4 shadow-xl shadow-black/20">
-                <div className="text-lg font-semibold">Your Feed</div>
-                <div className="text-sm text-white/70">
-                  Explore posts, discussions and movie recommendations.
-                </div>
-              </div>
+        <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+          <div className="mx-auto w-full">
+            <section className="space-y-6">
+            
 
               {filtered.map((p) => (
                 <article
                   key={p.id}
                   onClick={() => navigate(`/post/${p.id}`)}
-                  className="cursor-pointer rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-5 shadow-xl shadow-black/20 hover:bg-white/15 transition"
+                  className="group cursor-pointer overflow-hidden rounded-[28px] border border-white/15 bg-[linear-gradient(160deg,rgba(255,255,255,0.18),rgba(255,255,255,0.06))] p-5 sm:p-6 backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition duration-300 hover:-translate-y-0.5 hover:border-white/30 hover:shadow-[0_28px_70px_rgba(0,0,0,0.45)]"
                 >
+                  <div className="pointer-events-none absolute" />
+
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-sm font-semibold">
+                      <div className="h-11 w-11 rounded-2xl border border-white/20 bg-black/20 flex items-center justify-center text-sm font-semibold shadow-inner shadow-black/25">
                         {p.author.slice(0, 1).toUpperCase()}
                       </div>
                       <div>
-                        <div className="font-semibold leading-5">{p.author}</div>
+                        <div className="font-semibold leading-5 text-white/95">{p.author}</div>
                         <div className="text-xs text-white/60">{p.createdAt}</div>
                       </div>
                     </div>
-
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate("/profile");
-                      }}
-                      className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
-                    >
-                      My profile
-                    </button>
                   </div>
 
-                  <div className="mt-4">
-                    <div className="text-base font-semibold">{p.title}</div>
-                    <p className="mt-1 text-sm text-white/80 leading-6">{p.text}</p>
+                  <div className="mt-5">
+                    <div className="text-lg font-semibold leading-7 text-white">{p.title}</div>
+                    <p className="mt-2 text-sm text-white/80 leading-7">{p.text}</p>
                   </div>
 
                   {p.poster ? (
-                    <div className="mt-4 overflow-hidden rounded-2xl border border-white/10">
+                    <div className="mt-5 overflow-hidden rounded-2xl border border-white/20">
                       <img
                         src={p.poster}
                         alt=""
-                        className="h-48 w-full object-cover opacity-90"
+                        className="h-56 w-full object-cover opacity-90 transition duration-500 group-hover:scale-[1.02]"
                       />
                     </div>
                   ) : null}
 
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                  <div className="mt-5 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           // TODO: like mock
                           console.log("like", p.id);
                         }}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-2 text-sm hover:bg-black/30"
+                        className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-black/25 px-4 py-2 text-sm hover:bg-black/35 transition"
                       >
                         <Heart
                           className={`h-4 w-4 ${
@@ -200,10 +181,9 @@ export default function Home() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          // TODO: comments page later
                           console.log("comments", p.id);
                         }}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-2 text-sm hover:bg-black/30"
+                        className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-black/25 px-4 py-2 text-sm hover:bg-black/35 transition"
                       >
                         <MessageCircle className="h-4 w-4 text-white/80" />
                         <span className="text-white/90">{p.commentsCount}</span>
@@ -217,50 +197,16 @@ export default function Home() {
                   </div>
                 </article>
               ))}
+              {filtered.length === 0 ? (
+                <div className="rounded-3xl border border-white/15 bg-white/10 p-10 text-center backdrop-blur-xl">
+                  <p className="text-lg font-semibold">No posts found</p>
+                  <p className="mt-2 text-sm text-white/70">
+                    Try a different search term or create a new discussion.
+                  </p>
+                </div>
+              ) : null}
             </section>
 
-            <aside className="space-y-4">
-              <div className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-5 shadow-xl shadow-black/20">
-                <div className="font-semibold">Trending</div>
-                <ul className="mt-3 space-y-2 text-sm text-white/80">
-                  <li className="flex items-center justify-between">
-                    <span>#SciFi</span>
-                    <span className="text-white/60">1.2k</span>
-                  </li>
-                  <li className="flex items-center justify-between">
-                    <span>#PlotTwists</span>
-                    <span className="text-white/60">860</span>
-                  </li>
-                  <li className="flex items-center justify-between">
-                    <span>#ComfortMovies</span>
-                    <span className="text-white/60">640</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-5 shadow-xl shadow-black/20">
-                <div className="font-semibold">Quick actions</div>
-                <div className="mt-3 grid grid-cols-1 gap-2">
-                  <button
-                    onClick={() => navigate("/create")}
-                    className="rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-95"
-                  >
-                    Create a post
-                  </button>
-
-                  <button
-                    onClick={() => navigate("/profile")}
-                    className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
-                  >
-                    My profile
-                  </button>
-
-                  <button className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15">
-                    Saved posts
-                  </button>
-                </div>
-              </div>
-            </aside>
           </div>
         </main>
       </div>
