@@ -4,12 +4,12 @@ export type Post = {
     id: string;
     username: string;
     avatarUrl?: string;
+    email: string;
   };
   createdAt: string;
   title: string;
   text: string;
   imageUrl?: string;
-
   likesCount: number;
   commentsCount: number;
   liked?: boolean;

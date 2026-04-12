@@ -1,61 +1,27 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Heart, MessageCircle } from "lucide-react";
-
-type FeedPost = {
-  id: string;
-  author: string;
-  createdAt: string;
-  title: string;
-  text: string;
-  poster?: string;
-  likesCount: number;
-  commentsCount: number;
-  liked?: boolean;
-};
+import { MessageCircle, Trash2, Pencil } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { getAllPosts, deletePost, type Post } from "../lib/posts";
 
 export default function PostDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [posts, setPosts] = useState<Post[]>([]);
 
-  const posts: FeedPost[] = useMemo(
-    () => [
-      {
-        id: "1",
-        author: "Sofie Miller",
-        createdAt: "2h ago",
-        title: "Best plot twists you didn’t see coming",
-        text: "Drop your favorite twist-movie without spoilers 👀",
-        poster: "/images/movie-collage-bg.jpg",
-        likesCount: 128,
-        commentsCount: 34,
-        liked: true,
-      },
-      {
-        id: "2",
-        author: "Ruby Collins",
-        createdAt: "Yesterday",
-        title: "Underrated sci-fi movies (2000–2010)",
-        text: "I’m building a watchlist—send recs!",
-        likesCount: 57,
-        commentsCount: 12,
-        liked: false,
-      },
-      {
-        id: "3",
-        author: "Aiya Morgan",
-        createdAt: "3 days ago",
-        title: "Comfort movies for a rainy night",
-        text: "My pick: About Time. Yours?",
-        likesCount: 92,
-        commentsCount: 19,
-        liked: false,
-      },
-    ],
-    []
-  );
+  useEffect(() => {
+    if (!user) return;
+    setPosts(getAllPosts(user));
+  }, [user]);
 
   const post = useMemo(() => posts.find((p) => p.id === id), [posts, id]);
+
+  const handleDelete = () => {
+    if (!post) return;
+    deletePost(post.id);
+    navigate("/home");
+  };
 
   return (
     <div className="min-h-screen relative text-white">
@@ -73,12 +39,15 @@ export default function PostDetails() {
             <h1 className="text-2xl md:text-3xl font-bold">Post details</h1>
           </div>
 
-          <button
-            onClick={() => navigate("/home")}
-            className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
-          >
-            Back
-          </button>
+          <div className="flex items-center gap-2">
+
+            <button
+              onClick={() => navigate("/home")}
+              className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
+            >
+              Back
+            </button>
+          </div>
         </div>
 
         {!post ? (
@@ -94,16 +63,40 @@ export default function PostDetails() {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="h-12 w-12 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-lg font-semibold">
-                  {post.author.slice(0, 1).toUpperCase()}
+                  {post.author.username.slice(0, 1).toUpperCase()}
                 </div>
                 <div>
-                  <div className="font-semibold">{post.author}</div>
+                  <div className="font-semibold">{post.author.username}</div>
                   <div className="text-xs text-white/60">{post.createdAt}</div>
                 </div>
               </div>
 
-              <div className="text-xs text-white/60 font-mono">id: {post.id}</div>
-            </div>
+      {user?.email === post.author.email ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/post/${post.id}/edit`);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-xl border border-white/20 bg-black/25 px-2.5 py-1.5 text-xs hover:bg-white/15 transition"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete();
+                          }}
+                          className="inline-flex items-center gap-1 rounded-xl border border-red-400/30 bg-red-500/20 px-2.5 py-1.5 text-xs text-red-100 hover:bg-red-500/50 transition"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete
+                        </button>
+                      </div>
+                    ) : null}            
+                    </div>
 
         
             <div className="mt-6">
@@ -112,10 +105,10 @@ export default function PostDetails() {
             </div>
 
        
-            {post.poster ? (
+            {post.imageUrl ? (
               <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
                 <img
-                  src={post.poster}
+                  src={post.imageUrl}
                   alt=""
                   className="w-full max-h-[420px] object-cover opacity-90"
                 />
@@ -125,12 +118,6 @@ export default function PostDetails() {
             {/* Actions */}
             <div className="mt-6 flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3">
-                <button className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-2 text-sm hover:bg-black/30">
-                  <Heart
-                    className={`h-4 w-4 ${post.liked ? "text-primary" : "text-white/80"}`}
-                  />
-                  <span className="text-white/90">{post.likesCount}</span>
-                </button>
 
                 <button
                   onClick={() => navigate(`/post/${post.id}/comments`)}
