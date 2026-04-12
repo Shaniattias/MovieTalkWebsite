@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { MessageCircle, Trash2, Pencil } from "lucide-react";
+import { Heart, MessageCircle, Trash2, Pencil } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { getAllPosts, deletePost, type Post } from "../lib/posts";
+import { getAllPosts, deletePost, toggleLike, type Post } from "../lib/posts";
 
 export default function PostDetails() {
   const { id } = useParams();
@@ -21,6 +21,13 @@ export default function PostDetails() {
     if (!post) return;
     deletePost(post.id);
     navigate("/home");
+  };
+
+  const handleToggleLike = () => {
+    if (!post) return;
+    const updated = toggleLike(post.id);
+    if (!updated) return;
+    setPosts((prev) => prev.map((p) => (p.id === post.id ? updated : p)));
   };
 
   return (
@@ -42,7 +49,7 @@ export default function PostDetails() {
           <div className="flex items-center gap-2">
 
             <button
-              onClick={() => navigate("/home")}
+              onClick={() => navigate(-1)}
               className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
             >
               Back
@@ -118,14 +125,24 @@ export default function PostDetails() {
             {/* Actions */}
             <div className="mt-6 flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3">
+                <button
+                  onClick={handleToggleLike}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm"
+                >
+                  <Heart
+                    className={`h-6 w-6 ${
+                      post.liked ? "fill-current text-primary" : "text-white/80"
+                    }`}
+                  />
+                  <span className="text-white/90">{post.likesCount}</span>
+                </button>
 
                 <button
                   onClick={() => navigate(`/post/${post.id}/comments`)}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-2 text-sm hover:bg-black/30"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm"
                 >
-                  <MessageCircle className="h-4 w-4 text-white/80" />
+                  <MessageCircle className="h-6 w-6 text-white/80" />
                   <span className="text-white/90">{post.commentsCount}</span>
-                  <span className="text-white/60 hidden sm:inline">Comments</span>
                 </button>
               </div>
 

@@ -52,7 +52,7 @@ export default function Comments() {
           </div>
 
           <button
-            onClick={() => navigate(`/post/${id}`)}
+            onClick={() => navigate(-1)}
             className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
           >
             Back
