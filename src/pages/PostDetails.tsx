@@ -49,7 +49,7 @@ export default function PostDetails() {
           <div className="flex items-center gap-2">
 
             <button
-              onClick={() => navigate("/home")}
+              onClick={() => navigate(-1)}
               className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
             >
               Back
@@ -127,10 +127,10 @@ export default function PostDetails() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleToggleLike}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-2 text-sm hover:bg-black/30"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm"
                 >
                   <Heart
-                    className={`h-4 w-4 ${
+                    className={`h-6 w-6 ${
                       post.liked ? "fill-current text-primary" : "text-white/80"
                     }`}
                   />
@@ -139,11 +139,10 @@ export default function PostDetails() {
 
                 <button
                   onClick={() => navigate(`/post/${post.id}/comments`)}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-4 py-2 text-sm hover:bg-black/30"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm"
                 >
-                  <MessageCircle className="h-4 w-4 text-white/80" />
+                  <MessageCircle className="h-6 w-6 text-white/80" />
                   <span className="text-white/90">{post.commentsCount}</span>
-                  <span className="text-white/60 hidden sm:inline">Comments</span>
                 </button>
               </div>
 

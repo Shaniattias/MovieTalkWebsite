@@ -135,10 +135,10 @@ export default function Home() {
                           e.stopPropagation();
                           handleToggleLike(p.id);
                         }}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-black/25 px-4 py-2 text-sm hover:bg-black/35 transition"
+                        className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm transition"
                       >
                         <Heart
-                          className={`h-4 w-4 ${
+                          className={`h-6 w-6 ${
                             p.liked ? "fill-current text-primary" : "text-white/80"
                           }`}
                         />
@@ -148,15 +148,12 @@ export default function Home() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          console.log("comments", p.id);
+                          navigate(`/post/${p.id}/comments`);
                         }}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-black/25 px-4 py-2 text-sm hover:bg-black/35 transition"
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm"
                       >
-                        <MessageCircle className="h-4 w-4 text-white/80" />
+                        <MessageCircle className="h-6 w-6 text-white/80" />
                         <span className="text-white/90">{p.commentsCount}</span>
-                        <span className="text-white/60 hidden sm:inline">
-                          Comments
-                        </span>
                       </button>
                     </div>
 
