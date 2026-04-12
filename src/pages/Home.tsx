@@ -1,60 +1,21 @@
-import { useMemo, useState } from "react";
-import { Search, Plus, Heart, MessageCircle, UserRound } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Search, Plus, MessageCircle, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-type FeedPost = {
-  id: string;
-  author: string;
-  authorAvatar?: string;
-  createdAt: string;
-  title: string;
-  text: string;
-  poster?: string;
-  likesCount: number;
-  commentsCount: number;
-  liked?: boolean;
-};
+import { useAuth } from "../context/AuthContext";
+import { getAllPosts, type Post } from "../lib/posts";
 
 export default function Home() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
+  const [posts, setPosts] = useState<Post[]>([]);
 
-  const posts: FeedPost[] = useMemo(
-    () => [
-      {
-        id: "1",
-        author: "Sofie Miller",
-        createdAt: "2h ago",
-        title: "Best plot twists you didn’t see coming",
-        text: "Drop your favorite twist-movie without spoilers 👀",
-        poster: "/images/movie-collage-bg.jpg",
-        likesCount: 128,
-        commentsCount: 34,
-        liked: true,
-      },
-      {
-        id: "2",
-        author: "Ruby Collins",
-        createdAt: "Yesterday",
-        title: "Underrated sci-fi movies (2000–2010)",
-        text: "I’m building a watchlist—send recs!",
-        likesCount: 57,
-        commentsCount: 12,
-        liked: false,
-      },
-      {
-        id: "3",
-        author: "Aiya Morgan",
-        createdAt: "3 days ago",
-        title: "Comfort movies for a rainy night",
-        text: "My pick: About Time. Yours?",
-        likesCount: 92,
-        commentsCount: 19,
-        liked: false,
-      },
-    ],
-    []
-  );
+  useEffect(() => {
+    if (!user) return;
+    setPosts(getAllPosts(user));
+  }, [user]);
+
+
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -63,7 +24,7 @@ export default function Home() {
       (p) =>
         p.title.toLowerCase().includes(q) ||
         p.text.toLowerCase().includes(q) ||
-        p.author.toLowerCase().includes(q)
+        p.author.username.toLowerCase().includes(q)
     );
   }, [posts, query]);
 
@@ -136,13 +97,16 @@ export default function Home() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <div className="h-11 w-11 rounded-2xl border border-white/20 bg-black/20 flex items-center justify-center text-sm font-semibold shadow-inner shadow-black/25">
-                        {p.author.slice(0, 1).toUpperCase()}
+                        {p.author.username.slice(0, 1).toUpperCase()}
                       </div>
                       <div>
-                        <div className="font-semibold leading-5 text-white/95">{p.author}</div>
+                        <div className="font-semibold leading-5 text-white/95">
+                          {p.author.username}
+                        </div>
                         <div className="text-xs text-white/60">{p.createdAt}</div>
                       </div>
                     </div>
+
                   </div>
 
                   <div className="mt-5">
@@ -150,10 +114,10 @@ export default function Home() {
                     <p className="mt-2 text-sm text-white/80 leading-7">{p.text}</p>
                   </div>
 
-                  {p.poster ? (
+                  {p.imageUrl ? (
                     <div className="mt-5 overflow-hidden rounded-2xl border border-white/20">
                       <img
-                        src={p.poster}
+                        src={p.imageUrl}
                         alt=""
                         className="h-56 w-full object-cover opacity-90 transition duration-500 group-hover:scale-[1.02]"
                       />
@@ -162,22 +126,6 @@ export default function Home() {
 
                   <div className="mt-5 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // TODO: like mock
-                          console.log("like", p.id);
-                        }}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-black/25 px-4 py-2 text-sm hover:bg-black/35 transition"
-                      >
-                        <Heart
-                          className={`h-4 w-4 ${
-                            p.liked ? "text-primary" : "text-white/80"
-                          }`}
-                        />
-                        <span className="text-white/90">{p.likesCount}</span>
-                      </button>
-
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -193,7 +141,7 @@ export default function Home() {
                       </button>
                     </div>
 
-                    {/* הסרנו את Open post — כל הפוסט כבר לחיץ */}
+
                   </div>
                 </article>
               ))}

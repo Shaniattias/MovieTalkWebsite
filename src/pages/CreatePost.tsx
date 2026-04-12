@@ -1,24 +1,36 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Image as ImageIcon } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { createPost } from "../lib/posts";
 
 export default function CreatePost() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | undefined>();
 
-  const previewUrl = useMemo(() => {
-    if (!imageFile) return null;
-    return URL.createObjectURL(imageFile);
-  }, [imageFile]);
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setImageUrl(undefined);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") setImageUrl(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const canPublish = title.trim().length > 0 && text.trim().length > 0;
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("CREATE POST (mock)", { title, text, imageFile });
+    if (!user) return;
+    createPost({ title: title.trim(), text: text.trim(), imageUrl }, user);
     navigate("/home");
   };
 
@@ -74,15 +86,15 @@ export default function CreatePost() {
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+                onChange={handleImageChange}
                 className="block w-full text-sm file:mr-4 file:rounded-xl file:border-0 file:bg-white/10 file:px-4 file:py-2 file:text-white hover:file:bg-white/15"
               />
 
               <div className="mt-4">
-                {previewUrl ? (
+                {imageUrl ? (
                   <div className="overflow-hidden rounded-2xl border border-white/10">
                     <img
-                      src={previewUrl}
+                      src={imageUrl}
                       alt="preview"
                       className="w-full max-h-[320px] object-cover"
                     />
@@ -103,7 +115,7 @@ export default function CreatePost() {
               onClick={() => {
                 setTitle("");
                 setText("");
-                setImageFile(null);
+                setImageUrl(undefined);
               }}
               className="rounded-2xl bg-white/10 border border-white/10 px-5 py-2 text-sm hover:bg-white/15"
             >

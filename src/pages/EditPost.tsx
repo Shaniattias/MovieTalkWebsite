@@ -1,21 +1,56 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Image as ImageIcon } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { getAllPosts, updatePost } from "../lib/posts";
 
 export default function EditPost() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { user } = useAuth();
 
-  const [title, setTitle] = useState("Best plot twists you didn’t see coming");
-  const [description, setDescription] = useState(
-    "Drop your favorite twist-movie without spoilers 👀"
-  );
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | undefined>();
 
-  const previewUrl = useMemo(() => {
-    if (!imageFile) return null;
-    return URL.createObjectURL(imageFile);
-  }, [imageFile]);
+  useEffect(() => {
+    if (!user || !id) return;
+    const posts = getAllPosts(user);
+    const current = posts.find((post) => post.id === id);
+    if (!current) return;
+    if (current.author.email !== user.email) {
+      navigate(`/post/${id}`);
+      return;
+    }
+
+    setTitle(current.title);
+    setDescription(current.text);
+    setImageUrl(current.imageUrl);
+  }, [user, id, navigate]);
+
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setImageUrl(result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSave = () => {
+    if (!id) return;
+    updatePost(id, {
+      title: title.trim(),
+      text: description.trim(),
+      imageUrl,
+    });
+    navigate(`/post/${id}`);
+  };
 
   return (
     <div className="min-h-screen relative text-white">
@@ -63,15 +98,15 @@ export default function EditPost() {
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+                onChange={handleImageChange}
                 className="block w-full text-sm file:mr-4 file:rounded-xl file:border-0 file:bg-white/10 file:px-4 file:py-2 file:text-white hover:file:bg-white/15"
               />
 
               <div className="mt-4">
-                {previewUrl ? (
+                {imageUrl ? (
                   <div className="overflow-hidden rounded-2xl border border-white/10">
                     <img
-                      src={previewUrl}
+                      src={imageUrl}
                       alt="Selected preview"
                       className="w-full max-h-[320px] object-cover"
                     />
@@ -97,6 +132,7 @@ export default function EditPost() {
 
             <button
               type="button"
+              onClick={handleSave}
               className="rounded-2xl bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground hover:opacity-95"
             >
               Save
