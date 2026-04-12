@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { Camera } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -25,6 +26,18 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [avatar, setAvatar] = useState<string | undefined>();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") setAvatar(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const {
     register,
@@ -50,7 +63,7 @@ export default function Register() {
         password: data.password,
       });
       if (result.success) {
-        loginMock(data.email, data.name);
+        loginMock(data.email, data.name, avatar);
         navigate("/home");
       } else setError("Registration failed. Please try again.");
     } catch {
@@ -108,6 +121,33 @@ export default function Register() {
               {error}
             </div>
           )}
+
+          {/* Avatar upload */}
+          <div className="flex flex-col items-center gap-3 mb-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="relative h-20 w-20 rounded-full overflow-hidden bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/15 transition group"
+            >
+              {avatar ? (
+                <img src={avatar} alt="Avatar preview" className="h-full w-full object-cover" />
+              ) : (
+                <Camera className="h-7 w-7 text-white/50 group-hover:text-white/80 transition" />
+              )}
+              <div className="absolute inset-0 flex items-end justify-center pb-1 opacity-0 group-hover:opacity-100 transition">
+                <span className="text-[10px] text-white/80 bg-black/40 px-1.5 py-0.5 rounded-full">
+                  {avatar ? "Change" : "Add photo"}
+                </span>
+              </div>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div>

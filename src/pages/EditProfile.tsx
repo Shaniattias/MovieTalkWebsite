@@ -62,7 +62,7 @@ export default function EditProfile() {
               {avatar ? (
                 <img src={avatar} alt="Profile preview" className="h-full w-full object-cover" />
               ) : (
-                user?.email?.[0]?.toUpperCase() || "U"
+                user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U"
               )}
             </div>
 
