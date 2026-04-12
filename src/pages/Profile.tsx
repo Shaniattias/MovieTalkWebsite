@@ -1,11 +1,24 @@
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { LogOut, UserPen } from "lucide-react";
+import { getAllPosts, type Post } from "../lib/posts";
 
 
 export default function Profile() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [posts, setPosts] = useState<Post[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    setPosts(getAllPosts(user));
+  }, [user]);
+
+  const userPosts = useMemo(() => {
+    if (!user) return [];
+    return posts.filter((post) => post.author.email === user.email);
+  }, [posts, user]);
 
   const handleLogout = () => {
     logout();
@@ -82,20 +95,31 @@ export default function Profile() {
           <h2 className="text-xl font-semibold mb-4">My posts</h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div
-                key={i}
-                className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur-xl p-4 shadow-xl"
-              >
-                <div className="h-36 rounded-xl bg-black/30 mb-3" />
-                <div className="font-semibold text-sm">
-                  My movie post #{i}
+            {userPosts.length > 0 ? (
+              userPosts.map((post) => (
+                <div
+                  key={post.id}
+                  onClick={() => navigate(`/post/${post.id}`)}
+                  className="cursor-pointer rounded-2xl border border-white/10 bg-white/10 backdrop-blur-xl p-4 shadow-xl hover:bg-white/15 transition"
+                >
+                  {post.imageUrl ? (
+                    <img
+                      src={post.imageUrl}
+                      alt={post.title}
+                      className="h-36 w-full rounded-xl object-cover mb-3"
+                    />
+                  ) : (
+                    <div className="h-36 rounded-xl bg-black/30 mb-3" />
+                  )}
+                  <div className="font-semibold text-sm">{post.title}</div>
+                  <p className="text-xs text-white/70 mt-1 line-clamp-2">{post.text}</p>
                 </div>
-                <p className="text-xs text-white/70 mt-1">
-                  This is a placeholder for user content.
-                </p>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur-xl p-6 text-sm text-white/70 col-span-full">
+                No posts yet for this user.
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
