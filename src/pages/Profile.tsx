@@ -1,10 +1,16 @@
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { LogOut, UserPen } from "lucide-react";
 
 
 export default function Profile() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
 
   return (
@@ -19,42 +25,52 @@ export default function Profile() {
 
      
       <div className="relative z-10 mx-auto max-w-5xl px-4 py-10">
-        <div className="flex items-center justify-between mb-6">
-  
+        <div className="flex items-center justify-end mb-6">
 
-  <button
-    onClick={() => navigate("/home")}
-    className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
-  >
-    Back
-  </button>
-</div>
+      <button
+            onClick={() => navigate("/home")}
+            className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
+          >
+            Back
+        </button>
+      </div>
 
         
         <div className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-8 shadow-2xl">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
       
-            <div className="h-32 w-32 rounded-full bg-white/20 border border-white/20 flex items-center justify-center text-4xl font-bold">
-              {user?.email?.[0]?.toUpperCase() || "U"}
+            <div className="h-32 w-32 overflow-hidden rounded-full bg-white/20 border border-white/20 flex items-center justify-center text-4xl font-bold">
+              {user?.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt="Profile"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                user?.email?.[0]?.toUpperCase() || "U"
+              )}
             </div>
 
             <div className="flex-1">
-              <h1 className="text-3xl font-bold">My Profile</h1>
+              <h1 className="text-3xl font-bold">
+                {user?.name || user?.email?.split("@")[0] || "My Profile"}
+              </h1>
               <p className="mt-2 text-white/70">{user?.email}</p>
 
               <div className="mt-6 flex flex-wrap gap-3">
-                <button className="rounded-2xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:opacity-95">
+                <button
+                  onClick={() => navigate("/profile/edit")}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-gray-500/30 border border-gray-300/30 px-5 py-2 text-sm font-semibold text-white hover:bg-gray-500/40"
+                >
+                  <UserPen className="h-4 w-4" />
                   Edit profile
                 </button>
 
-                <button className="rounded-2xl bg-white/10 border border-white/10 px-5 py-2 text-sm hover:bg-white/15">
-                  Change avatar
-                </button>
-
                 <button
-                  onClick={logout}
-                  className="rounded-2xl bg-destructive/20 border border-destructive/40 px-5 py-2 text-sm text-destructive hover:bg-destructive/30"
+                  onClick={handleLogout}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-red-600 border border-red-500 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700"
                 >
+                  <LogOut className="h-4 w-4" />
                   Logout
                 </button>
               </div>

@@ -6,26 +6,22 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { GoogleButton } from "../components/ui/GoogleButton";
 import { authApi } from "../lib/auth";
+import { useAuth } from "../context/AuthContext";
 
-const registerSchema = z
-  .object({
-    name: z.string().min(2, "Name must be at least 2 characters"),
-    email: z.string().email("Please enter a valid email address"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string(),
-    acceptTerms: z.boolean().refine((v) => v === true, {
-      message: "You must accept the terms and conditions",
-    }),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });
+const registerSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  acceptTerms: z.boolean().refine((v) => v === true, {
+    message: "You must accept the terms and conditions",
+  }),
+});
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function Register() {
   const navigate = useNavigate();
+  const { loginMock } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +36,6 @@ export default function Register() {
       name: "",
       email: "",
       password: "",
-      confirmPassword: "",
       acceptTerms: false,
     },
   });
@@ -54,8 +49,10 @@ export default function Register() {
         email: data.email,
         password: data.password,
       });
-      if (result.success) navigate("/login");
-      else setError("Registration failed. Please try again.");
+      if (result.success) {
+        loginMock(data.email, data.name);
+        navigate("/home");
+      } else setError("Registration failed. Please try again.");
     } catch {
       setError("Registration failed. Please try again.");
     } finally {
@@ -99,7 +96,7 @@ export default function Register() {
             <img
               src="/images/logo.png"
               alt="MovieTalk Logo"
-              className="w-12 h-12 opacity-90"
+              className="w-12 h-12"
             />
             <h1 className="text-3xl font-bold text-white/90 mt-4">
               Join MovieTalk
@@ -114,10 +111,10 @@ export default function Register() {
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div>
-              <label className={labelClass}>Name</label>
+              <label className={labelClass}>Username</label>
               <input
                 className={inputClass}
-                placeholder="Your name"
+                placeholder="username"
                 {...register("name")}
               />
               {errors.name && <p className={errClass}>{errors.name.message}</p>}
@@ -148,23 +145,10 @@ export default function Register() {
               )}
             </div>
 
-            <div>
-              <label className={labelClass}>Confirm Password</label>
-              <input
-                className={inputClass}
-                type="password"
-                placeholder="••••••••"
-                {...register("confirmPassword")}
-              />
-              {errors.confirmPassword && (
-                <p className={errClass}>{errors.confirmPassword.message}</p>
-              )}
-            </div>
-
             <label className="flex items-center gap-3 text-sm text-white/65">
               <input
                 type="checkbox"
-                className="h-4 w-4 accent-red-500"
+                className="h-4 w-4 accent-red-600"
                 {...register("acceptTerms")}
               />
               I accept the terms and conditions
@@ -176,7 +160,7 @@ export default function Register() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full h-12 rounded-full bg-red-500 hover:bg-red-600 transition text-white font-semibold disabled:opacity-60"
+              className="w-full h-12 rounded-full bg-red-600 hover:bg-red-800 transition text-white font-semibold disabled:opacity-60"
             >
               {isLoading ? "Signing up..." : "Sign up"}
             </button>
@@ -194,7 +178,7 @@ export default function Register() {
 
           <div className="text-center mt-6 text-sm">
             <span className="text-white/60">Already have an account? </span>
-            <Link to="/login" className="text-red-300 hover:text-red-200 font-medium">
+            <Link to="/login" className="text-red-600 hover:text-red-800 font-medium">
               Sign in
             </Link>
           </div>

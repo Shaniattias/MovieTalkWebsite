@@ -7,7 +7,6 @@ import { Link, useNavigate } from "react-router-dom";
 
 
 import { GoogleButton } from "../components/ui/GoogleButton";
-import { LoginForm } from "../components/ui/LoginForm";
 import { authApi } from "../lib/auth";
 import { useAuth } from "../context/AuthContext";
 
@@ -32,19 +31,26 @@ export default function Login() {
     defaultValues: { email: "", password: "" },
   });
 
-  const onSubmit = async (data: LoginFormValues) => {
-  setIsLoading(true);
-  setError(null);
+  const inputClass =
+    "w-full h-12 px-5 rounded-full bg-white/10 text-white placeholder:text-white/55 " +
+    "border border-white/20 backdrop-blur focus:outline-none focus:ring-1 focus:ring-red-500/50";
 
-  try {
-    loginMock(data.email);   
-    navigate("/Home");     
-  } catch {
-    setError("Login failed. Please try again.");
-  } finally {
-    setIsLoading(false);
-  }
-};
+  const labelClass = "block text-sm text-white/70 mb-2";
+  const errClass = "mt-2 text-xs text-red-200";
+
+  const onSubmit = async (data: LoginFormValues) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      loginMock(data.email);
+      navigate("/home");
+    } catch {
+      setError("Login failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
 
   const handleGoogleLogin = async () => {
@@ -67,26 +73,19 @@ export default function Login() {
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/images/movie-collage-bg.jpg')" }}
       >
-        <div className="absolute inset-0 bg-black/70" />
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.8) 100%)",
-          }}
-        />
+        <div className="absolute inset-0 bg-black/75" />
       </div>
 
-      <div className="relative z-10 w-full max-w-md">
-        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl">
+      <div className="relative z-10 w-full max-w-sm">
+        <div className="backdrop-blur-2xl bg-white/10 border border-white/15 rounded-3xl p-8 shadow-[0_25px_70px_rgba(0,0,0,0.55)]">
 
-          <div className="flex flex-col items-center mb-8">
+          <div className="flex flex-col items-center mb-6">
             <img
               src="/images/logo.png"
               alt="MovieTalk Logo"
-              className="w-16 h-16"
+              className="w-12 h-12"
             />
-            <h1 className="text-3xl font-bold text-foreground mt-4">
+            <h1 className="text-3xl font-bold text-white/90 mt-4">
               MovieTalk
             </h1>
           </div>
@@ -95,20 +94,58 @@ export default function Login() {
             <div
               role="alert"
               aria-live="polite"
-              className="mb-6 p-3 bg-destructive/10 border border-destructive/30 rounded-xl text-destructive text-sm text-center"
+              className="mb-4 p-2 text-sm text-red-200 bg-red-500/10 border border-red-500/20 rounded-lg text-center"
             >
               {error}
             </div>
           )}
 
-          <LoginForm form={form} onSubmit={onSubmit} isLoading={isLoading} />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+            <div>
+              <label className={labelClass}>Email</label>
+              <input
+                className={inputClass}
+                type="email"
+                placeholder="name@email.com"
+                autoComplete="email"
+                {...form.register("email")}
+              />
+              {form.formState.errors.email && (
+                <p className={errClass}>{form.formState.errors.email.message}</p>
+              )}
+            </div>
 
+            <div>
+              <label className={labelClass}>Password</label>
+              <input
+                className={inputClass}
+                type="password"
+                placeholder="••••••••"
+                autoComplete="current-password"
+                {...form.register("password")}
+              />
+              {form.formState.errors.password && (
+                <p className={errClass}>
+                  {form.formState.errors.password.message}
+                </p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-12 rounded-full bg-red-600 hover:bg-red-800 transition text-white font-semibold disabled:opacity-60"
+            >
+              {isLoading ? "Logging in..." : "Login"}
+            </button>
+          </form>
+
+
+        
           <div className="flex items-center gap-4 my-6">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-muted-foreground text-xs uppercase tracking-wider">
-              or
-            </span>
-            <div className="flex-1 h-px bg-border" />
+            <div className="flex-1 h-px bg-white/15" />
+            <span className="text-white/50 text-xs uppercase">or</span>
+            <div className="flex-1 h-px bg-white/15" />
           </div>
 
           <div className="flex justify-center">
