@@ -44,7 +44,9 @@ export async function createPost(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const post = await Post.create({ author: authorId, title, text });
+  const imageUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
+
+  const post = await Post.create({ author: authorId, title, text, imageUrl });
   await post.populate("author", "username");
 
   res.status(201).json(post);
@@ -66,6 +68,7 @@ export async function updatePost(req: Request, res: Response): Promise<void> {
   const { title, text } = req.body;
   if (title) post.title = title;
   if (text) post.text = text;
+  if (req.file) post.imageUrl = `/uploads/${req.file.filename}`;
 
   await post.save();
   await post.populate("author", "username");
