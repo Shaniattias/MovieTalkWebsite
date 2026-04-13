@@ -334,6 +334,10 @@ export function deletePost(id: string): void {
  * Toggles the liked state and updates the like count.
  * Returns the updated post, or null if not found.
  */
+export function syncPostCommentsCount(postId: string, commentsCount: number): void {
+  saveToStorage(loadFromStorage().map((p) => p.id === postId ? { ...p, commentsCount } : p));
+}
+
 export async function toggleLike(id: string): Promise<Post | null> {
   const response = await api.post(`/likes/${id}`);
   const { liked, likesCount } = response.data as { liked: boolean; likesCount: number };

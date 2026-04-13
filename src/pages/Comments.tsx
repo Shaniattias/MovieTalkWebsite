@@ -1,38 +1,79 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Send } from "lucide-react";
+import { Send, Trash2 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import api from "../lib/api";
+import { syncPostCommentsCount } from "../lib/posts";
 
 type Comment = {
   id: string;
-  author: string;
+  author: { id: string; username: string };
   createdAt: string;
   text: string;
 };
 
+type BackendComment = {
+  _id: string;
+  author: { _id: string; username: string };
+  text: string;
+  createdAt: string;
+};
+
+function mapComment(c: BackendComment): Comment {
+  return {
+    id: c._id,
+    author: { id: c.author._id, username: c.author.username },
+    text: c.text,
+    createdAt: new Date(c.createdAt).toLocaleString(),
+  };
+}
+
 export default function Comments() {
-  const { id } = useParams();
+  const { id: postId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
+  const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // MOCK comments (בהמשך יגיע מהשרת)
-  const comments: Comment[] = useMemo(
-    () => [
-      { id: "c1", author: "Sofie Miller", createdAt: "10m ago", text: "Love this topic 🔥" },
-      { id: "c2", author: "Ruby Collins", createdAt: "1h ago", text: "My pick: Shutter Island 😅" },
-      { id: "c3", author: "Aiya Morgan", createdAt: "Yesterday", text: "So many good twists!!" },
-    ],
-    []
-  );
+  useEffect(() => {
+    if (!postId) return;
+    api
+      .get(`/comments/${postId}`)
+      .then((res) => setComments((res.data as BackendComment[]).map(mapComment)))
+      .catch(() => setError("Failed to load comments."));
+  }, [postId]);
 
-  const onAddComment = (e: React.FormEvent) => {
+  const onAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim()) return;
+    if (!newComment.trim() || !postId) return;
 
-    // Mock action
-    console.log("ADD COMMENT (mock)", { postId: id, text: newComment });
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const res = await api.post(`/comments/${postId}`, { text: newComment.trim() });
+      const { comment, commentsCount } = res.data as { comment: BackendComment; commentsCount: number };
+      setComments((prev) => [...prev, mapComment(comment)]);
+      syncPostCommentsCount(postId, commentsCount);
+      setNewComment("");
+    } catch {
+      setError("Failed to add comment. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-    setNewComment("");
+  const onDeleteComment = async (commentId: string) => {
+    try {
+      const res = await api.delete(`/comments/${commentId}`);
+      const { commentsCount } = res.data as { commentsCount: number };
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      if (postId) syncPostCommentsCount(postId, commentsCount);
+    } catch {
+      setError("Failed to delete comment.");
+    }
   };
 
   return (
@@ -59,6 +100,12 @@ export default function Comments() {
           </button>
         </div>
 
+        {error && (
+          <div className="mb-4 p-2 text-sm text-red-200 bg-red-500/10 border border-red-500/20 rounded-lg text-center">
+            {error}
+          </div>
+        )}
+
         {/* Add comment */}
         <form
           onSubmit={onAddComment}
@@ -75,11 +122,11 @@ export default function Comments() {
             />
             <button
               type="submit"
-              disabled={!newComment.trim()}
+              disabled={!newComment.trim() || isSubmitting}
               className="inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Send className="h-4 w-4" />
-              Send
+              {isSubmitting ? "Sending…" : "Send"}
             </button>
           </div>
         </form>
@@ -92,12 +139,29 @@ export default function Comments() {
               className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-5 shadow-xl shadow-black/20"
             >
               <div className="flex items-center justify-between">
-                <div className="font-semibold">{c.author}</div>
-                <div className="text-xs text-white/60">{c.createdAt}</div>
+                <div className="font-semibold">{c.author.username}</div>
+                <div className="flex items-center gap-3">
+                  <div className="text-xs text-white/60">{c.createdAt}</div>
+                  {user?.username === c.author.username && (
+                    <button
+                      onClick={() => onDeleteComment(c.id)}
+                      className="inline-flex items-center gap-1 rounded-xl border border-red-400/30 bg-red-500/20 px-2 py-1 text-xs text-red-100 hover:bg-red-500/50 transition"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
               <p className="mt-2 text-sm text-white/80 leading-6">{c.text}</p>
             </div>
           ))}
+
+          {comments.length === 0 && (
+            <div className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-8 text-center">
+              <p className="text-white/60 text-sm">No comments yet. Be the first!</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
