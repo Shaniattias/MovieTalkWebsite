@@ -9,6 +9,10 @@ export const authApi = {
     return { success: true, token: response.data.token, user: response.data.user };
   },
 
+  logout: async () => {
+    await api.post("/auth/logout");
+  },
+
   oauthLogin: async (provider: "google") => {
     console.log(`Initiating ${provider} OAuth login`);
     await new Promise((resolve) => setTimeout(resolve, 500));

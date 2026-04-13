@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
+import { authApi } from "../lib/auth";
 
 export type AuthUser = {
   name?: string;
@@ -9,9 +10,9 @@ export type AuthUser = {
 type AuthContextValue = {
   user: AuthUser | null;
   isAuthenticated: boolean;
-  loginMock: (email: string, name?: string, avatar?: string) => void;
+  loginMock: (email: string, name?: string, avatar?: string, token?: string) => void;
   updateProfile: (updates: Pick<AuthUser, "name" | "avatar">) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -45,7 +46,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // proceed with local cleanup even if the server call fails
+    }
     setUser(null);
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(TOKEN_KEY);
