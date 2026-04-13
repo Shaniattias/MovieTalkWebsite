@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(./node_modules/.bin/tsc --noEmit)",
-      "Bash(echo \"exit: $?\")",
-      "Bash(npm install:*)"
-    ]
-  }
-}

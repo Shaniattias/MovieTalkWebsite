@@ -49,7 +49,7 @@ export default function PostDetails() {
           <div className="flex items-center gap-2">
 
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate("/home")}
               className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
             >
               Back
