@@ -1,26 +1,9 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { User } from "../models/User";
-import {
-  createSession,
-  fallbackUsername,
-  sanitizeUser,
-  verifyGoogleAccessToken,
-  verifyRefreshToken,
-} from "../services/auth.service";
 
-function sendAuthResponse(res: Response, status: number, payload: {
-  accessToken: string;
-  refreshToken: string;
-  user: ReturnType<typeof sanitizeUser>;
-}): void {
-  res.status(status).json({
-    accessToken: payload.accessToken,
-    refreshToken: payload.refreshToken,
-    token: payload.accessToken,
-    user: payload.user,
-  });
-}
+const JWT_SECRET = process.env.JWT_SECRET as string;
+const JWT_EXPIRES_IN = "1h";
 
 export async function register(req: Request, res: Response): Promise<void> {
   const { username, email, password } = req.body;
@@ -37,20 +20,13 @@ export async function register(req: Request, res: Response): Promise<void> {
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await User.create({
-    username,
-    email: String(email).toLowerCase(),
-    passwordHash,
-    authProvider: "local",
-    refreshTokens: [],
-  });
+  const user = await User.create({ username, email, passwordHash });
 
-  const { accessToken, refreshToken } = await createSession(user);
+  const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
-  sendAuthResponse(res, 201, {
-    accessToken,
-    refreshToken,
-    user: sanitizeUser(user),
+  res.status(201).json({
+    token,
+    user: { id: user._id, username: user.username, email: user.email },
   });
 }
 
@@ -79,126 +55,47 @@ export async function login(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const { accessToken, refreshToken } = await createSession(user);
+  const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
-  sendAuthResponse(res, 200, {
-    accessToken,
-    refreshToken,
-    user: sanitizeUser(user),
+  res.status(200).json({
+    token,
+    user: { id: user._id, username: user.username, email: user.email },
   });
 }
 
-export async function googleAuth(req: Request, res: Response): Promise<void> {
-  const { accessToken: googleAccessToken } = req.body;
-
-  if (!googleAccessToken) {
-    res.status(400).json({ message: "Google access token is required" });
-    return;
-  }
-
-  try {
-    const googleUser = await verifyGoogleAccessToken(String(googleAccessToken));
-    let user = await User.findOne({ email: googleUser.email });
-
-    if (!user) {
-      user = await User.create({
-        username: fallbackUsername(googleUser.name, googleUser.email),
-        email: googleUser.email,
-        profileImage: googleUser.picture,
-        googleId: googleUser.googleId,
-        authProvider: "google",
-        refreshTokens: [],
-      });
-    } else {
-      let changed = false;
-
-      if (!user.googleId) {
-        user.googleId = googleUser.googleId;
-        changed = true;
-      }
-
-      if (!user.profileImage && googleUser.picture) {
-        user.profileImage = googleUser.picture;
-        changed = true;
-      }
-
-      if (!user.passwordHash && user.authProvider !== "google") {
-        user.authProvider = "google";
-        changed = true;
-      }
-
-      if (changed) {
-        await user.save();
-      }
-    }
-
-    const { accessToken, refreshToken } = await createSession(user);
-
-    sendAuthResponse(res, 200, {
-      accessToken,
-      refreshToken,
-      user: sanitizeUser(user),
-    });
-  } catch (err) {
-    if (err instanceof Error && err.message.includes("GOOGLE_CLIENT_ID")) {
-      res.status(500).json({ message: "Google auth is not configured on the server" });
-      return;
-    }
-
-    res.status(401).json({ message: "Invalid Google credential" });
-  }
-}
-
 export async function refresh(req: Request, res: Response): Promise<void> {
-  const { refreshToken } = req.body;
+  const token = req.cookies?.refreshToken;
 
-  if (!refreshToken) {
-    res.status(400).json({ message: "refreshToken is required" });
+  if (!token) {
+    res.status(401).json({ message: "No refresh token" });
     return;
   }
 
+  let payload: { userId: string };
   try {
-    const payload = verifyRefreshToken(String(refreshToken));
-    const user = await User.findOne({
-      _id: payload.userId,
-      refreshTokens: String(refreshToken),
-    });
-
-    if (!user) {
-      res.status(401).json({ message: "Invalid refresh token" });
-      return;
-    }
-
-    const nextTokens = await createSession(user, String(refreshToken));
-    sendAuthResponse(res, 200, {
-      ...nextTokens,
-      user: sanitizeUser(user),
-    });
+    payload = jwt.verify(token, REFRESH_TOKEN_SECRET) as { userId: string };
   } catch {
-    res.status(401).json({ message: "Invalid refresh token" });
+    res.status(401).json({ message: "Invalid or expired refresh token" });
+    return;
   }
+
+  const user = await User.findById(payload.userId);
+  if (!user || user.refreshToken !== token) {
+    res.status(401).json({ message: "Refresh token mismatch" });
+    return;
+  }
+
+  const newAccessToken = signAccessToken(user._id.toString());
+  res.status(200).json({ token: newAccessToken });
 }
 
 export async function logout(req: Request, res: Response): Promise<void> {
-  const { refreshToken } = req.body;
+  const token = req.cookies?.refreshToken;
 
-  if (!refreshToken) {
-    res.status(400).json({ message: "refreshToken is required" });
-    return;
+  if (token) {
+    await User.findOneAndUpdate({ refreshToken: token }, { refreshToken: undefined });
   }
 
-  try {
-    const payload = verifyRefreshToken(String(refreshToken));
-    await User.updateOne(
-      { _id: payload.userId },
-      { $pull: { refreshTokens: String(refreshToken) } }
-    );
-  } catch {
-    await User.updateOne(
-      { refreshTokens: String(refreshToken) },
-      { $pull: { refreshTokens: String(refreshToken) } }
-    );
-  }
-
+  res.clearCookie("refreshToken", REFRESH_COOKIE_OPTIONS);
   res.status(200).json({ message: "Logged out" });
 }

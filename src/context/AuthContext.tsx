@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { authApi, type ApiUser, type AuthResponse } from "../lib/auth";
+import React, { createContext, useContext, useMemo, useState } from "react";
 
 export type AuthUser = {
   id: string;
@@ -16,45 +15,14 @@ type AuthContextValue = {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
-  isInitializing: boolean;
-  completeAuth: (payload: AuthResponse) => void;
+  loginMock: (email: string, name?: string, avatar?: string) => void;
   updateProfile: (updates: Pick<AuthUser, "name" | "avatar">) => void;
   logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const STORAGE_KEY = "movietalk_auth";
-
-type StoredAuth = {
-  accessToken: string;
-  refreshToken: string;
-  user: AuthUser;
-};
-
-function mapUser(user: ApiUser): AuthUser {
-  return {
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    profileImage: user.profileImage,
-    authProvider: user.authProvider,
-    name: user.username,
-    avatar: user.profileImage,
-  };
-}
-
-function readStoredAuth(): StoredAuth | null {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return null;
-
-  try {
-    return JSON.parse(raw) as StoredAuth;
-  } catch {
-    localStorage.removeItem(STORAGE_KEY);
-    return null;
-  }
-}
+const STORAGE_KEY = "movietalk_user";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -78,49 +46,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     persistSession(null);
   };
 
-  const completeAuth = (payload: AuthResponse) => {
-    const nextUser = mapUser(payload.user);
-    const nextState: StoredAuth = {
-      accessToken: payload.accessToken,
-      refreshToken: payload.refreshToken,
-      user: nextUser,
-    };
-
-    setUser(nextUser);
-    setAccessToken(payload.accessToken);
-    setRefreshToken(payload.refreshToken);
-    persistSession(nextState);
+  const loginMock = (email: string, name?: string, avatar?: string) => {
+    const u: AuthUser = { email, name, avatar };
+    setUser(u);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
   };
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function bootstrapSession() {
-      const stored = readStoredAuth();
-      if (!stored) {
-        if (isMounted) setIsInitializing(false);
-        return;
-      }
-
-      try {
-        const refreshed = await authApi.refresh(stored.refreshToken);
-        if (!isMounted) return;
-        completeAuth(refreshed);
-      } catch {
-        if (!isMounted) return;
-        clearSession();
-      } finally {
-        if (isMounted) setIsInitializing(false);
-      }
-    }
-
-    void bootstrapSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
 
   const updateProfile = (updates: Pick<AuthUser, "name" | "avatar">) => {
     setUser((prev) => {
@@ -145,17 +75,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const logout = async () => {
-    const refresh = refreshToken;
-    clearSession();
-
-    if (refresh) {
-      try {
-        await authApi.logout(refresh);
-      } catch {
-        // Ignore logout failures because local session is already cleared.
-      }
-    }
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem(STORAGE_KEY);
   };
 
   const value = useMemo<AuthContextValue>(

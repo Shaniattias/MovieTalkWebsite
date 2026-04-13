@@ -44,11 +44,10 @@ export default function Login() {
     setError(null);
 
     try {
-      const session = await authApi.login(data);
-      completeAuth(session);
+      loginMock(data.email);
       navigate("/home");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed. Please try again.");
+    } catch {
+      setError("Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
