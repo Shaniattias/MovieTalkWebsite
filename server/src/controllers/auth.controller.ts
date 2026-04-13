@@ -4,7 +4,24 @@ import jwt from "jsonwebtoken";
 import { User } from "../models/User";
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
-const JWT_EXPIRES_IN = "1h";
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET as string;
+const ACCESS_TOKEN_EXPIRES_IN = "15m";
+const REFRESH_TOKEN_EXPIRES_IN = "7d";
+
+const REFRESH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: (process.env.NODE_ENV === "production" ? "none" : "lax") as "none" | "lax",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+};
+
+function signAccessToken(userId: string): string {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES_IN });
+}
+
+function signRefreshToken(userId: string): string {
+  return jwt.sign({ userId }, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+}
 
 export async function register(req: Request, res: Response): Promise<void> {
   const { username, email, password } = req.body;
@@ -21,12 +38,18 @@ export async function register(req: Request, res: Response): Promise<void> {
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await User.create({ username, email, passwordHash });
+  const refreshToken = signRefreshToken("temp");
 
-  const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  const user = await User.create({ username, email, passwordHash, refreshToken });
 
+  const finalRefreshToken = signRefreshToken(user._id.toString());
+  await User.findByIdAndUpdate(user._id, { refreshToken: finalRefreshToken });
+
+  const accessToken = signAccessToken(user._id.toString());
+
+  res.cookie("refreshToken", finalRefreshToken, REFRESH_COOKIE_OPTIONS);
   res.status(201).json({
-    token,
+    token: accessToken,
     user: { id: user._id, username: user.username, email: user.email },
   });
 }
@@ -51,10 +74,51 @@ export async function login(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  const accessToken = signAccessToken(user._id.toString());
+  const refreshToken = signRefreshToken(user._id.toString());
 
+  await User.findByIdAndUpdate(user._id, { refreshToken });
+
+  res.cookie("refreshToken", refreshToken, REFRESH_COOKIE_OPTIONS);
   res.status(200).json({
-    token,
+    token: accessToken,
     user: { id: user._id, username: user.username, email: user.email },
   });
+}
+
+export async function refresh(req: Request, res: Response): Promise<void> {
+  const token = req.cookies?.refreshToken;
+
+  if (!token) {
+    res.status(401).json({ message: "No refresh token" });
+    return;
+  }
+
+  let payload: { userId: string };
+  try {
+    payload = jwt.verify(token, REFRESH_TOKEN_SECRET) as { userId: string };
+  } catch {
+    res.status(401).json({ message: "Invalid or expired refresh token" });
+    return;
+  }
+
+  const user = await User.findById(payload.userId);
+  if (!user || user.refreshToken !== token) {
+    res.status(401).json({ message: "Refresh token mismatch" });
+    return;
+  }
+
+  const newAccessToken = signAccessToken(user._id.toString());
+  res.status(200).json({ token: newAccessToken });
+}
+
+export async function logout(req: Request, res: Response): Promise<void> {
+  const token = req.cookies?.refreshToken;
+
+  if (token) {
+    await User.findOneAndUpdate({ refreshToken: token }, { refreshToken: undefined });
+  }
+
+  res.clearCookie("refreshToken", REFRESH_COOKIE_OPTIONS);
+  res.status(200).json({ message: "Logged out" });
 }
