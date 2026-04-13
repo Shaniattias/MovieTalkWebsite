@@ -44,7 +44,7 @@ export default function Login() {
 
     try {
       const result = await authApi.login({ email: data.email, password: data.password });
-      loginMock(result.user.email, result.user.username);
+      loginMock(result.user.email, result.user.username, undefined, result.token);
       navigate("/home");
     } catch {
       setError("Invalid email or password.");

@@ -17,6 +17,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const STORAGE_KEY = "movietalk_user";
+const TOKEN_KEY = "movietalk_token";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => {
@@ -24,10 +25,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return raw ? (JSON.parse(raw) as AuthUser) : null;
   });
 
-  const loginMock = (email: string, name?: string, avatar?: string) => {
+  const loginMock = (email: string, name?: string, avatar?: string, token?: string) => {
     const u: AuthUser = { email, name, avatar };
     setUser(u);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
+    if (token) localStorage.setItem(TOKEN_KEY, token);
   };
 
   const updateProfile = (updates: Pick<AuthUser, "name" | "avatar">) => {
@@ -46,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setUser(null);
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(TOKEN_KEY);
   };
 
   const value = useMemo<AuthContextValue>(
