@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
-dotenv.config();
+import path from "path";
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 import app from "./app";
 import { connectMongo } from "./db/mongo";
@@ -11,7 +12,14 @@ app.get("/api/health", (_req, res) => {
 });
 
 async function start() {
-  await connectMongo(process.env.MONGO_URI || "");
+  const mongoUri = process.env.MONGO_URI || "";
+  console.log(
+    "🔌 MONGO_URI →",
+    mongoUri
+      ? mongoUri.replace(/:([^:@]+)@/, ":***@")
+      : "MISSING — check server/.env"
+  );
+  await connectMongo(mongoUri);
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
