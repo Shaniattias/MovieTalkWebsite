@@ -15,10 +15,14 @@ export default function Home() {
     setPosts(getAllPosts(user));
   }, [user]);
 
-  const handleToggleLike = (postId: string) => {
-    const updated = toggleLike(postId);
-    if (!updated) return;
-    setPosts((prev) => prev.map((p) => (p.id === postId ? updated : p)));
+  const handleToggleLike = async (postId: string) => {
+    try {
+      const updated = await toggleLike(postId);
+      if (!updated) return;
+      setPosts((prev) => prev.map((p) => (p.id === postId ? updated : p)));
+    } catch {
+      // keep existing UI state on failure
+    }
   };
 
   const filtered = useMemo(() => {

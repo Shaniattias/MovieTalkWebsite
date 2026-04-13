@@ -23,11 +23,15 @@ export default function PostDetails() {
     navigate("/home");
   };
 
-  const handleToggleLike = () => {
+  const handleToggleLike = async () => {
     if (!post) return;
-    const updated = toggleLike(post.id);
-    if (!updated) return;
-    setPosts((prev) => prev.map((p) => (p.id === post.id ? updated : p)));
+    try {
+      const updated = await toggleLike(post.id);
+      if (!updated) return;
+      setPosts((prev) => prev.map((p) => (p.id === post.id ? updated : p)));
+    } catch {
+      // keep existing UI state on failure
+    }
   };
 
   return (

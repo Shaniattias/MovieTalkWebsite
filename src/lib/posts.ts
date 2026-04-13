@@ -334,13 +334,15 @@ export function deletePost(id: string): void {
  * Toggles the liked state and updates the like count.
  * Returns the updated post, or null if not found.
  */
-export function toggleLike(id: string): Post | null {
+export async function toggleLike(id: string): Promise<Post | null> {
+  const response = await api.post(`/likes/${id}`);
+  const { liked, likesCount } = response.data as { liked: boolean; likesCount: number };
+
   const posts = loadFromStorage();
   let updated: Post | null = null;
   const next = posts.map((p) => {
     if (p.id !== id) return p;
-    const liked = !p.liked;
-    updated = { ...p, liked, likesCount: p.likesCount + (liked ? 1 : -1) };
+    updated = { ...p, liked, likesCount };
     return updated;
   });
   if (!updated) return null;
