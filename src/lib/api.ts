@@ -1,10 +1,11 @@
 import axios from "axios";
 import type { AxiosRequestConfig } from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const rawApiUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:5001/api").replace(/\/$/, "");
+const API_BASE_URL = rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`;
 
 const api = axios.create({
-  baseURL: `${API_URL}/api`,
+  baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
   withCredentials: true,
 });
@@ -27,7 +28,7 @@ api.interceptors.response.use(
 
       try {
         const { data } = await axios.post(
-          `${API_URL}/api/auth/refresh`,
+          `${API_BASE_URL}/auth/refresh`,
           {},
           { withCredentials: true }
         );

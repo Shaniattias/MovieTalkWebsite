@@ -3,10 +3,26 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { User } from "../models/User";
 
-const JWT_SECRET = process.env.JWT_SECRET as string;
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET as string;
+type AuthRequest = Request & {
+  file?: Express.Multer.File;
+  userId?: string;
+};
+
 const ACCESS_TOKEN_EXPIRES_IN = "15m";
 const REFRESH_TOKEN_EXPIRES_IN = "7d";
+
+function getAuthSecrets(res: Response): { jwtSecret: string; refreshSecret: string } | null {
+  const jwtSecret = process.env.JWT_SECRET;
+  const refreshSecret =
+    process.env.REFRESH_TOKEN_SECRET || process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+
+  if (!jwtSecret || !refreshSecret) {
+    res.status(500).json({ message: "Server auth configuration is missing" });
+    return null;
+  }
+
+  return { jwtSecret, refreshSecret };
+}
 
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
@@ -15,16 +31,23 @@ const REFRESH_COOKIE_OPTIONS = {
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
-function signAccessToken(userId: string): string {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES_IN });
+function signAccessToken(userId: string, jwtSecret: string): string {
+  return jwt.sign({ userId }, jwtSecret, { expiresIn: ACCESS_TOKEN_EXPIRES_IN });
 }
 
-function signRefreshToken(userId: string): string {
-  return jwt.sign({ userId }, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+function signRefreshToken(userId: string, refreshSecret: string): string {
+  return jwt.sign({ userId }, refreshSecret, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
 }
 
 export async function register(req: Request, res: Response): Promise<void> {
+  const authReq = req as AuthRequest;
+  const secrets = getAuthSecrets(res);
+  if (!secrets) return;
+
   const { username, email, password } = req.body;
+  const profileImageFromFile = authReq.file ? `/uploads/profile/${authReq.file.filename}` : undefined;
+  const profileImageFromBody = typeof req.body.profileImage === "string" ? req.body.profileImage : undefined;
+  const profileImage = profileImageFromFile || profileImageFromBody;
 
   if (!username || !email || !password) {
     res.status(400).json({ message: "username, email and password are required" });
@@ -38,20 +61,29 @@ export async function register(req: Request, res: Response): Promise<void> {
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await User.create({ username, email, passwordHash });
+  const user = await User.create({ username, email, passwordHash, profileImage });
 
-  const accessToken = signAccessToken(user._id.toString());
-  const refreshToken = signRefreshToken(user._id.toString());
+  const accessToken = signAccessToken(user._id.toString(), secrets.jwtSecret);
+  const refreshToken = signRefreshToken(user._id.toString(), secrets.refreshSecret);
   await User.findByIdAndUpdate(user._id, { refreshToken });
 
   res.cookie("refreshToken", refreshToken, REFRESH_COOKIE_OPTIONS);
   res.status(201).json({
     token: accessToken,
-    user: { id: user._id, username: user.username, email: user.email },
+    user: {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      profileImage: user.profileImage,
+      authProvider: user.authProvider ?? "local",
+    },
   });
 }
 
 export async function login(req: Request, res: Response): Promise<void> {
+  const secrets = getAuthSecrets(res);
+  if (!secrets) return;
+
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -76,18 +108,65 @@ export async function login(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const accessToken = signAccessToken(user._id.toString());
-  const refreshToken = signRefreshToken(user._id.toString());
+  const accessToken = signAccessToken(user._id.toString(), secrets.jwtSecret);
+  const refreshToken = signRefreshToken(user._id.toString(), secrets.refreshSecret);
   await User.findByIdAndUpdate(user._id, { refreshToken });
 
   res.cookie("refreshToken", refreshToken, REFRESH_COOKIE_OPTIONS);
   res.status(200).json({
     token: accessToken,
-    user: { id: user._id, username: user.username, email: user.email },
+    user: {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      profileImage: user.profileImage,
+      authProvider: user.authProvider ?? "local",
+    },
+  });
+}
+
+export async function updateProfile(req: Request, res: Response): Promise<void> {
+  const authReq = req as AuthRequest;
+  const userId = authReq.userId;
+  if (!userId) {
+    res.status(401).json({ message: "Unauthorized" });
+    return;
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    res.status(404).json({ message: "User not found" });
+    return;
+  }
+
+  const { username } = req.body;
+  if (typeof username === "string" && username.trim().length > 0) {
+    user.username = username.trim();
+  }
+
+  if (authReq.file) {
+    user.profileImage = `/uploads/profile/${authReq.file.filename}`;
+  } else if (typeof req.body.profileImage === "string" && req.body.profileImage.trim().length > 0) {
+    user.profileImage = req.body.profileImage.trim();
+  }
+
+  await user.save();
+
+  res.status(200).json({
+    user: {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      profileImage: user.profileImage,
+      authProvider: user.authProvider ?? "local",
+    },
   });
 }
 
 export async function refresh(req: Request, res: Response): Promise<void> {
+  const secrets = getAuthSecrets(res);
+  if (!secrets) return;
+
   const token = req.cookies?.refreshToken;
 
   if (!token) {
@@ -97,7 +176,7 @@ export async function refresh(req: Request, res: Response): Promise<void> {
 
   let payload: { userId: string };
   try {
-    payload = jwt.verify(token, REFRESH_TOKEN_SECRET) as { userId: string };
+    payload = jwt.verify(token, secrets.refreshSecret) as unknown as { userId: string };
   } catch {
     res.status(401).json({ message: "Invalid or expired refresh token" });
     return;
@@ -109,7 +188,7 @@ export async function refresh(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const newAccessToken = signAccessToken(user._id.toString());
+  const newAccessToken = signAccessToken(user._id.toString(), secrets.jwtSecret);
   res.status(200).json({ token: newAccessToken });
 }
 

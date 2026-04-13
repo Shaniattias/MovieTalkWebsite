@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Image as ImageIcon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { createPost } from "../lib/posts";
+import { createPostAsync } from "../lib/posts";
 
 export default function CreatePost() {
   const navigate = useNavigate();
@@ -10,28 +10,34 @@ export default function CreatePost() {
 
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
-  const [imageUrl, setImageUrl] = useState<string | undefined>();
+  const [imageFile, setImageFile] = useState<File | undefined>();
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | undefined>();
+  const [error, setError] = useState<string | null>(null);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
-      setImageUrl(undefined);
+      setImageFile(undefined);
+      setImagePreviewUrl(undefined);
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") setImageUrl(reader.result);
-    };
-    reader.readAsDataURL(file);
+    setImageFile(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
   };
 
   const canPublish = title.trim().length > 0 && text.trim().length > 0;
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    createPost({ title: title.trim(), text: text.trim(), imageUrl }, user);
-    navigate("/home");
+    setError(null);
+
+    try {
+      await createPostAsync({ title: title.trim(), text: text.trim(), imageFile }, user);
+      navigate("/home");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to publish post.");
+    }
   };
 
   return (
@@ -59,6 +65,11 @@ export default function CreatePost() {
           onSubmit={onSubmit}
           className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-6 md:p-8 shadow-2xl"
         >
+          {error && (
+            <div className="mb-4 p-2 text-sm text-red-200 bg-red-500/10 border border-red-500/20 rounded-lg text-center">
+              {error}
+            </div>
+          )}
           <label className="block text-sm font-semibold mb-2">Title</label>
           <input
             value={title}
@@ -91,10 +102,10 @@ export default function CreatePost() {
               />
 
               <div className="mt-4">
-                {imageUrl ? (
+                {imagePreviewUrl ? (
                   <div className="overflow-hidden rounded-2xl border border-white/10">
                     <img
-                      src={imageUrl}
+                      src={imagePreviewUrl}
                       alt="preview"
                       className="w-full max-h-[320px] object-cover"
                     />
@@ -115,7 +126,8 @@ export default function CreatePost() {
               onClick={() => {
                 setTitle("");
                 setText("");
-                setImageUrl(undefined);
+                setImageFile(undefined);
+                setImagePreviewUrl(undefined);
               }}
               className="rounded-2xl bg-white/10 border border-white/10 px-5 py-2 text-sm hover:bg-white/15"
             >

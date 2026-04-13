@@ -2,18 +2,22 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Camera, Save } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { authApi } from "../lib/auth";
 
 export default function EditProfile() {
   const navigate = useNavigate();
   const { user, updateProfile } = useAuth();
 
-  const [name, setName] = useState(user?.name || user?.email?.split("@")[0] || "");
-  const [avatar, setAvatar] = useState<string | undefined>(user?.avatar);
+  const [name, setName] = useState(user?.name || user?.username || user?.email?.split("@")[0] || "");
+  const [avatar, setAvatar] = useState<string | undefined>(user?.avatar || user?.profileImage);
+  const [avatarFile, setAvatarFile] = useState<File | undefined>();
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setAvatarFile(file);
 
     const reader = new FileReader();
     reader.onload = () => {
@@ -27,11 +31,27 @@ export default function EditProfile() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    updateProfile({
-      name: name.trim() || user?.email?.split("@")[0] || "User",
-      avatar,
-    });
-    navigate("/profile");
+    setError(null);
+
+    try {
+      const username = name.trim() || user?.email?.split("@")[0] || "User";
+      const response = await authApi.updateProfile({
+        username,
+        profileImageFile: avatarFile,
+      });
+
+      updateProfile({
+        name: response.user.username,
+        avatar: response.user.profileImage,
+      });
+
+      navigate("/profile");
+    } catch (err) {
+      console.error("Profile update failed:", err);
+      setError(err instanceof Error ? err.message : "Failed to save profile changes.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -57,6 +77,11 @@ export default function EditProfile() {
           </button>
         </div>
         <div className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-6 md:p-8 shadow-2xl">
+          {error && (
+            <div className="mb-4 p-2 text-sm text-red-200 bg-red-500/10 border border-red-500/20 rounded-lg text-center">
+              {error}
+            </div>
+          )}
           <div className="mt-8 flex flex-col items-center gap-4">
             <div className="h-32 w-32 overflow-hidden rounded-full border border-white/20 bg-white/20 flex items-center justify-center text-4xl font-bold">
               {avatar ? (

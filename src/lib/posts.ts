@@ -6,14 +6,14 @@ import type { Post } from "../types/Post";
 export type CreatePostInput = {
   title: string;
   text: string;
-  imageUrl?: string;
+  imageFile?: File;
 };
 
 /** Fields that can be changed when editing an existing post */
 export type UpdatePostInput = {
   title: string;
   text: string;
-  imageUrl?: string;
+  imageFile?: File;
 };
 
 /** Re-export so pages only need one import */
@@ -25,11 +25,73 @@ type CurrentUser = {
   email: string;
   name?: string;
   avatar?: string;
+  profileImage?: string;
 };
 
 // ─── Private: storage helpers ────────────────────────────────────────────────
 
 const STORAGE_KEY = "movietalk_posts";
+const API_BASE_URL_RAW = (import.meta.env.VITE_API_URL ?? "http://localhost:5001/api").replace(/\/$/, "");
+const API_BASE_URL = API_BASE_URL_RAW.endsWith("/api") ? API_BASE_URL_RAW : `${API_BASE_URL_RAW}/api`;
+
+function toAbsoluteMediaUrl(pathOrUrl?: string): string | undefined {
+  if (!pathOrUrl) return undefined;
+  if (/^https?:\/\//i.test(pathOrUrl) || pathOrUrl.startsWith("data:")) {
+    return pathOrUrl;
+  }
+
+  try {
+    return `${new URL(API_BASE_URL).origin}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
+  } catch {
+    return pathOrUrl;
+  }
+}
+
+function getAccessToken(): string | null {
+  return localStorage.getItem("movietalk_token");
+}
+
+type BackendPost = {
+  _id: string;
+  title: string;
+  text: string;
+  imageUrl?: string;
+  likesCount?: number;
+  commentsCount?: number;
+  createdAt: string;
+  author:
+    | string
+    | {
+      _id?: string;
+      id?: string;
+      username?: string;
+      email?: string;
+      profileImage?: string;
+      avatarUrl?: string;
+    };
+};
+
+function mapBackendPost(post: BackendPost, fallbackAuthor?: CurrentUser): Post {
+  const authorObj = typeof post.author === "object" && post.author !== null ? post.author : undefined;
+  const authorEmail = authorObj?.email || fallbackAuthor?.email || "unknown@example.com";
+
+  return {
+    id: post._id,
+    author: {
+      id: authorObj?._id || authorObj?.id || `u-${authorEmail}`,
+      username: authorObj?.username || fallbackAuthor?.name || authorEmail.split("@")[0],
+      avatarUrl: toAbsoluteMediaUrl(authorObj?.profileImage || authorObj?.avatarUrl || fallbackAuthor?.avatar || fallbackAuthor?.profileImage),
+      email: authorEmail,
+    },
+    createdAt: new Date(post.createdAt).toLocaleString(),
+    title: post.title,
+    text: post.text,
+    imageUrl: toAbsoluteMediaUrl(post.imageUrl),
+    likesCount: post.likesCount ?? 0,
+    commentsCount: post.commentsCount ?? 0,
+    liked: false,
+  };
+}
 
 /**
  * Shape of posts that may exist in localStorage from before author.email was
@@ -104,6 +166,41 @@ function saveToStorage(posts: Post[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(posts));
 }
 
+function syncCurrentUserAuthorData(currentUser: CurrentUser | null): Post[] {
+  if (!currentUser) return loadFromStorage();
+
+  const posts = loadFromStorage();
+  const nextUsername = currentUser.name || currentUser.email.split("@")[0];
+  const nextAvatar = currentUser.avatar || currentUser.profileImage;
+
+  let changed = false;
+  const synced = posts.map((post) => {
+    if (post.author.email !== currentUser.email) return post;
+
+    const needsUsernameUpdate = post.author.username !== nextUsername;
+    const needsAvatarUpdate = post.author.avatarUrl !== nextAvatar;
+
+    if (!needsUsernameUpdate && !needsAvatarUpdate) return post;
+    changed = true;
+
+    return {
+      ...post,
+      author: {
+        ...post.author,
+        username: nextUsername,
+        avatarUrl: nextAvatar,
+      },
+    };
+  });
+
+  if (changed) {
+    saveToStorage(synced);
+    return synced;
+  }
+
+  return posts;
+}
+
 // ─── Private: seed data ──────────────────────────────────────────────────────
 
 const SEED_COMMUNITY_POSTS: Post[] = [
@@ -129,48 +226,17 @@ const SEED_COMMUNITY_POSTS: Post[] = [
   },
 ];
 
-function buildOwnerSeedPost(user: CurrentUser): Post {
-  return {
-    id: "234",
-    author: {
-      id: "u-owner",
-      username: user.name || user.email.split("@")[0],
-      avatarUrl: user.avatar,
-      email: user.email,
-    },
-    createdAt: "2h ago",
-    title: "Best plot twists you did not see coming",
-    text: "Drop your favorite twist movie without spoilers.",
-    imageUrl: "/images/movie-collage-bg.jpg",
-    likesCount: 128,
-    commentsCount: 34,
-    liked: true,
-  };
-}
-
 /**
- * Ensures the store is populated for the active user.
+ * Ensures the store is populated with baseline community posts.
  * Called internally by getAllPosts.
  */
-function ensureSeed(currentUser: CurrentUser | null): Post[] {
+function ensureSeed(): Post[] {
   const existing = loadFromStorage();
 
   if (existing.length === 0) {
-    const seed = currentUser
-      ? [buildOwnerSeedPost(currentUser), ...SEED_COMMUNITY_POSTS]
-      : SEED_COMMUNITY_POSTS;
+    const seed = SEED_COMMUNITY_POSTS;
     saveToStorage(seed);
     return seed;
-  }
-
-  // New user with no posts yet — prepend their seed post
-  if (currentUser) {
-    const hasOwnerPost = existing.some((p) => p.author.email === currentUser.email);
-    if (!hasOwnerPost) {
-      const withOwner = [buildOwnerSeedPost(currentUser), ...existing];
-      saveToStorage(withOwner);
-      return withOwner;
-    }
   }
 
   return existing;
@@ -182,10 +248,11 @@ function ensureSeed(currentUser: CurrentUser | null): Post[] {
 
 /**
  * GET /posts
- * Returns all posts, initialising seed data for the current user if needed.
+ * Returns all posts, initialising baseline seed data if needed.
  */
 export function getAllPosts(currentUser?: CurrentUser | null): Post[] {
-  return ensureSeed(currentUser ?? null);
+  ensureSeed();
+  return syncCurrentUserAuthorData(currentUser ?? null);
 }
 
 /**
@@ -196,47 +263,73 @@ export function getPostById(id: string): Post | null {
   return loadFromStorage().find((p) => p.id === id) ?? null;
 }
 
-/**
- * POST /posts
- * Creates and persists a new post; returns it.
- */
-export function createPost(input: CreatePostInput, author: CurrentUser): Post {
-  const posts = loadFromStorage();
-  const newPost: Post = {
-    id: crypto.randomUUID(),
-    author: {
-      id: `u-${author.email}`,
-      username: author.name || author.email.split("@")[0],
-      avatarUrl: author.avatar,
-      email: author.email,
-    },
-    createdAt: "Just now",
-    title: input.title,
-    text: input.text,
-    imageUrl: input.imageUrl,
-    likesCount: 0,
-    commentsCount: 0,
-    liked: false,
-  };
-  saveToStorage([newPost, ...posts]);
-  return newPost;
+export async function createPostAsync(input: CreatePostInput, author: CurrentUser): Promise<Post> {
+  const token = getAccessToken();
+  if (!token) {
+    throw new Error("You must be logged in to create a post.");
+  }
+
+  const formData = new FormData();
+  formData.append("title", input.title);
+  formData.append("text", input.text);
+  if (input.imageFile) {
+    formData.append("image", input.imageFile);
+  }
+
+  const res = await fetch(`${API_BASE_URL}/posts`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({ message: "Failed to create post" }));
+    throw new Error(errorBody.message || "Failed to create post");
+  }
+
+  const backendPost = (await res.json()) as BackendPost;
+  const createdPost = mapBackendPost(backendPost, author);
+  const existing = loadFromStorage();
+  saveToStorage([createdPost, ...existing]);
+  return createdPost;
 }
 
-/**
- * PATCH /posts/:id
- * Updates editable fields; returns the updated post, or null if not found.
- */
-export function updatePost(id: string, input: UpdatePostInput): Post | null {
-  const posts = loadFromStorage();
-  let updated: Post | null = null;
-  const next = posts.map((p) => {
-    if (p.id !== id) return p;
-    updated = { ...p, ...input };
-    return updated;
+export async function updatePostAsync(
+  id: string,
+  input: UpdatePostInput,
+  fallbackAuthor?: CurrentUser
+): Promise<Post | null> {
+  const token = getAccessToken();
+  if (!token) {
+    throw new Error("You must be logged in to update a post.");
+  }
+
+  const formData = new FormData();
+  formData.append("title", input.title);
+  formData.append("text", input.text);
+  if (input.imageFile) {
+    formData.append("image", input.imageFile);
+  }
+
+  const res = await fetch(`${API_BASE_URL}/posts/${id}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
   });
-  if (!updated) return null;
+
+  if (res.status === 404) return null;
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({ message: "Failed to update post" }));
+    throw new Error(errorBody.message || "Failed to update post");
+  }
+
+  const backendPost = (await res.json()) as BackendPost;
+  const updatedPost = mapBackendPost(backendPost, fallbackAuthor);
+  const posts = loadFromStorage();
+  const next = posts.map((p) => (p.id === id ? updatedPost : p));
   saveToStorage(next);
-  return updated;
+  return updatedPost;
 }
 
 /**

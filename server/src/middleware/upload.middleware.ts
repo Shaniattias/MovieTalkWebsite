@@ -2,17 +2,25 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-const UPLOADS_DIR = path.join(__dirname, "../../uploads");
+const UPLOADS_ROOT = path.join(__dirname, "../../uploads");
+const PROFILE_UPLOADS_DIR = path.join(UPLOADS_ROOT, "profile");
+const POST_UPLOADS_DIR = path.join(UPLOADS_ROOT, "posts");
 
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+for (const dir of [UPLOADS_ROOT, PROFILE_UPLOADS_DIR, POST_UPLOADS_DIR]) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
 }
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+  destination: (req, _file, cb) => {
+    const destination = req.baseUrl.includes("/auth") ? PROFILE_UPLOADS_DIR : POST_UPLOADS_DIR;
+    cb(null, destination);
+  },
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    const safeName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9-_]/g, "_");
+    const unique = `${Date.now()}-${safeName}${ext}`;
     cb(null, unique);
   },
 });

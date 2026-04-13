@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { LogOut, UserPen } from "lucide-react";
+import { LogOut, Plus, UserPen } from "lucide-react";
 import { getAllPosts, type Post } from "../lib/posts";
 
 
@@ -77,6 +77,14 @@ export default function Profile() {
                 >
                   <UserPen className="h-4 w-4" />
                   Edit profile
+                </button>
+
+                 <button
+                  onClick={() => navigate("/create")}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-gray-500/30 border border-gray-300/30 px-5 py-2 text-sm font-semibold text-white hover:bg-gray-500/40"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create post
                 </button>
 
                 <button

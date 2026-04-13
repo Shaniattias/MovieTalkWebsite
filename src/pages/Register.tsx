@@ -28,10 +28,12 @@ export default function Register() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<string | undefined>();
+  const [avatarFile, setAvatarFile] = useState<File | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setAvatarFile(file);
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === "string") setAvatar(reader.result);
@@ -61,6 +63,7 @@ export default function Register() {
         name: data.name,
         email: data.email,
         password: data.password,
+        profileImageFile: avatarFile,
       });
       completeAuth(session);
       navigate("/home");

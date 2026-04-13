@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Image as ImageIcon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { getAllPosts, updatePost } from "../lib/posts";
+import { getAllPosts, updatePostAsync } from "../lib/posts";
 
 export default function EditPost() {
   const navigate = useNavigate();
@@ -12,6 +12,8 @@ export default function EditPost() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState<string | undefined>();
+  const [imageFile, setImageFile] = useState<File | undefined>();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user || !id) return;
@@ -31,25 +33,29 @@ export default function EditPost() {
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setImageFile(file);
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result === "string") {
-        setImageUrl(result);
-      }
-    };
-    reader.readAsDataURL(file);
+    setImageUrl(URL.createObjectURL(file));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!id) return;
-    updatePost(id, {
-      title: title.trim(),
-      text: description.trim(),
-      imageUrl,
-    });
-    navigate(`/post/${id}`);
+    setError(null);
+
+    try {
+      await updatePostAsync(
+        id,
+        {
+          title: title.trim(),
+          text: description.trim(),
+          imageFile,
+        },
+        user ?? undefined
+      );
+      navigate(`/post/${id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update post.");
+    }
   };
 
   return (
@@ -75,6 +81,11 @@ export default function EditPost() {
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-6 md:p-8 shadow-2xl">
+          {error && (
+            <div className="mb-4 p-2 text-sm text-red-200 bg-red-500/10 border border-red-500/20 rounded-lg text-center">
+              {error}
+            </div>
+          )}
           <label className="block text-sm font-semibold mb-2">Title</label>
           <input
             value={title}

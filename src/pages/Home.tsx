@@ -101,7 +101,15 @@ export default function Home() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <div className="h-11 w-11 rounded-2xl border border-white/20 bg-black/20 flex items-center justify-center text-sm font-semibold shadow-inner shadow-black/25">
-                        {p.author.username.slice(0, 1).toUpperCase()}
+                        {p.author.avatarUrl ? (
+                          <img
+                            src={p.author.avatarUrl}
+                            alt={`${p.author.username} avatar`}
+                            className="h-full w-full object-cover rounded-2xl"
+                          />
+                        ) : (
+                          p.author.username.slice(0, 1).toUpperCase()
+                        )}
                       </div>
                       <div>
                         <div className="font-semibold leading-5 text-white/95">

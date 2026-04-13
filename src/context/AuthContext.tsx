@@ -28,7 +28,7 @@ type AuthContextValue = {
   isAuthenticated: boolean;
   isInitializing: boolean;
   completeAuth: (session: Session) => void;
-  updateProfile: (updates: Pick<AuthUser, "name" | "avatar">) => void;
+  updateProfile: (updates: { name?: string; avatar?: string }) => void;
   logout: () => Promise<void>;
 };
 
@@ -64,20 +64,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
     setUser(u);
     setAccessToken(session.token);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
-    localStorage.setItem(TOKEN_KEY, session.token);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
+      localStorage.setItem(TOKEN_KEY, session.token);
+    } catch (err) {
+      console.error("Failed to persist auth state:", err);
+    }
   };
 
-  const updateProfile = (updates: Pick<AuthUser, "name" | "avatar">) => {
+  const updateProfile = (updates: { name?: string; avatar?: string }) => {
     setUser((prev) => {
       if (!prev) return prev;
+      const nextName = updates.name ?? prev.name ?? prev.username;
+      const nextAvatar = updates.avatar ?? prev.avatar;
       const next: AuthUser = {
         ...prev,
-        name: updates.name,
-        avatar: updates.avatar,
-        profileImage: updates.avatar,
+        username: nextName || prev.username,
+        name: nextName,
+        avatar: nextAvatar,
+        profileImage: nextAvatar,
       };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch (err) {
+        console.error("Failed to persist profile update:", err);
+      }
       return next;
     });
   };

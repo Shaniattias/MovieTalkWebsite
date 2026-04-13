@@ -9,7 +9,11 @@ export async function getPosts(req: Request, res: Response): Promise<void> {
   const skip = (page - 1) * limit;
 
   const [posts, total] = await Promise.all([
-    Post.find().populate("author", "username").sort({ createdAt: -1 }).skip(skip).limit(limit),
+    Post.find()
+      .populate("author", "username email profileImage")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
     Post.countDocuments(),
   ]);
 
@@ -17,7 +21,7 @@ export async function getPosts(req: Request, res: Response): Promise<void> {
 }
 
 export async function getPostById(req: Request, res: Response): Promise<void> {
-  const post = await Post.findById(req.params.id).populate("author", "username");
+  const post = await Post.findById(req.params.id).populate("author", "username email profileImage");
 
   if (!post) {
     res.status(404).json({ message: "Post not found" });
@@ -29,7 +33,7 @@ export async function getPostById(req: Request, res: Response): Promise<void> {
 
 export async function getPostsByUser(req: Request, res: Response): Promise<void> {
   const posts = await Post.find({ author: req.params.userId })
-    .populate("author", "username")
+    .populate("author", "username email profileImage")
     .sort({ createdAt: -1 });
 
   res.status(200).json(posts);
@@ -44,10 +48,10 @@ export async function createPost(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const imageUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
+  const imageUrl = req.file ? `/uploads/posts/${req.file.filename}` : undefined;
 
   const post = await Post.create({ author: authorId, title, text, imageUrl });
-  await post.populate("author", "username");
+  await post.populate("author", "username email profileImage");
 
   res.status(201).json(post);
 }
@@ -68,10 +72,10 @@ export async function updatePost(req: Request, res: Response): Promise<void> {
   const { title, text } = req.body;
   if (title) post.title = title;
   if (text) post.text = text;
-  if (req.file) post.imageUrl = `/uploads/${req.file.filename}`;
+  if (req.file) post.imageUrl = `/uploads/posts/${req.file.filename}`;
 
   await post.save();
-  await post.populate("author", "username");
+  await post.populate("author", "username email profileImage");
 
   res.status(200).json(post);
 }
