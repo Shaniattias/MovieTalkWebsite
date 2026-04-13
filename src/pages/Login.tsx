@@ -8,6 +8,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { GoogleButton } from "../components/ui/GoogleButton";
 import { authApi } from "../lib/auth";
+import { useGoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../context/AuthContext";
 
 
@@ -23,7 +24,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-    const { loginMock } = useAuth();
+  const { completeAuth } = useAuth();
 
 
   const form = useForm<LoginFormValues>({
@@ -43,27 +44,45 @@ export default function Login() {
     setError(null);
 
     try {
-      loginMock(data.email);
+      const session = await authApi.login(data);
+      completeAuth(session);
       navigate("/home");
-    } catch {
-      setError("Login failed. Please try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
 
-  const handleGoogleLogin = async () => {
-    setIsGoogleLoading(true);
-    setError(null);
-    try {
-      await authApi.oauthLogin("google");
-      console.log("Google OAuth initiated!");
-    } catch {
-      setError("Failed to connect with Google. Please try again.");
-    } finally {
+  const loginWithGoogle = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        const session = await authApi.googleLogin(tokenResponse.access_token);
+        completeAuth(session);
+        navigate("/home");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to connect with Google.");
+      } finally {
+        setIsGoogleLoading(false);
+      }
+    },
+    onError: () => {
+      setError("Google login failed. Please try again.");
       setIsGoogleLoading(false);
-    }
+    },
+    onNonOAuthError: (err) => {
+      if (err.type !== "popup_closed") {
+        setError("Google login was cancelled or failed.");
+      }
+      setIsGoogleLoading(false);
+    },
+  });
+
+  const handleGoogleLogin = () => {
+    setError(null);
+    setIsGoogleLoading(true);
+    loginWithGoogle();
   };
 
   return (
