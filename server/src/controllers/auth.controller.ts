@@ -1,9 +1,27 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { User } from "../models/User";
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
-const JWT_EXPIRES_IN = "1h";
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET as string;
+const ACCESS_TOKEN_EXPIRES_IN = "15m";
+const REFRESH_TOKEN_EXPIRES_IN = "7d";
+
+const REFRESH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: (process.env.NODE_ENV === "production" ? "none" : "lax") as "none" | "lax",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+};
+
+function signAccessToken(userId: string): string {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES_IN });
+}
+
+function signRefreshToken(userId: string): string {
+  return jwt.sign({ userId }, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+}
 
 export async function register(req: Request, res: Response): Promise<void> {
   const { username, email, password } = req.body;
@@ -22,10 +40,13 @@ export async function register(req: Request, res: Response): Promise<void> {
   const passwordHash = await bcrypt.hash(password, 10);
   const user = await User.create({ username, email, passwordHash });
 
-  const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  const accessToken = signAccessToken(user._id.toString());
+  const refreshToken = signRefreshToken(user._id.toString());
+  await User.findByIdAndUpdate(user._id, { refreshToken });
 
+  res.cookie("refreshToken", refreshToken, REFRESH_COOKIE_OPTIONS);
   res.status(201).json({
-    token,
+    token: accessToken,
     user: { id: user._id, username: user.username, email: user.email },
   });
 }
@@ -55,10 +76,13 @@ export async function login(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  const accessToken = signAccessToken(user._id.toString());
+  const refreshToken = signRefreshToken(user._id.toString());
+  await User.findByIdAndUpdate(user._id, { refreshToken });
 
+  res.cookie("refreshToken", refreshToken, REFRESH_COOKIE_OPTIONS);
   res.status(200).json({
-    token,
+    token: accessToken,
     user: { id: user._id, username: user.username, email: user.email },
   });
 }

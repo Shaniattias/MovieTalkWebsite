@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { AxiosRequestConfig } from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -14,12 +15,14 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+type RetryableConfig = AxiosRequestConfig & { _retry?: boolean };
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const original = error.config;
+    const original: RetryableConfig = error.config;
 
-    if (error.response?.status === 401 && !original._retry) {
+    if (error.response?.status === 401 && !original?._retry) {
       original._retry = true;
 
       try {
@@ -30,7 +33,9 @@ api.interceptors.response.use(
         );
 
         localStorage.setItem("movietalk_token", data.token);
-        original.headers.Authorization = `Bearer ${data.token}`;
+        if (original.headers) {
+          original.headers["Authorization"] = `Bearer ${data.token}`;
+        }
         return api(original);
       } catch {
         localStorage.removeItem("movietalk_token");

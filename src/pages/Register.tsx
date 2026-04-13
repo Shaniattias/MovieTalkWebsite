@@ -62,10 +62,8 @@ export default function Register() {
         email: data.email,
         password: data.password,
       });
-      if (result.success) {
-        loginMock(data.email, data.name, avatar);
-        navigate("/home");
-      } else setError("Registration failed. Please try again.");
+      completeAuth(session);
+      navigate("/home");
     } catch {
       setError("Registration failed. Please try again.");
     } finally {

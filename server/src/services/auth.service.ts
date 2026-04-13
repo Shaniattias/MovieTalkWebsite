@@ -5,7 +5,7 @@ const ACCESS_TOKEN_EXPIRES_IN = "15m";
 const REFRESH_TOKEN_EXPIRES_IN = "7d";
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
-const JWT_REFRESH_SECRET = (process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET) as string;
+const JWT_REFRESH_SECRET = (process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET) as string;
 
 type TokenPayload = {
   userId: string;
@@ -26,7 +26,7 @@ export function sanitizeUser(user: IUser): PublicUser {
     username: user.username,
     email: user.email,
     profileImage: user.profileImage,
-    authProvider: user.authProvider,
+    authProvider: user.authProvider ?? "local",
   };
 }
 

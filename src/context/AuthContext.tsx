@@ -1,21 +1,33 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { authApi } from "../lib/auth";
 
 export type AuthUser = {
   id: string;
   username: string;
   email: string;
+  name?: string;
+  avatar?: string;
   profileImage?: string;
   authProvider: "local" | "google";
-  name: string;
-  avatar?: string;
+};
+
+type Session = {
+  token: string;
+  user: {
+    id: string;
+    username: string;
+    email: string;
+    profileImage?: string;
+    authProvider?: "local" | "google";
+  };
 };
 
 type AuthContextValue = {
   user: AuthUser | null;
   accessToken: string | null;
-  refreshToken: string | null;
   isAuthenticated: boolean;
-  loginMock: (email: string, name?: string, avatar?: string) => void;
+  isInitializing: boolean;
+  completeAuth: (session: Session) => void;
   updateProfile: (updates: Pick<AuthUser, "name" | "avatar">) => void;
   logout: () => Promise<void>;
 };
@@ -23,75 +35,76 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const STORAGE_KEY = "movietalk_user";
+const TOKEN_KEY = "movietalk_token";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
 
-  const persistSession = (next: StoredAuth | null) => {
-    if (!next) {
-      localStorage.removeItem(STORAGE_KEY);
-      return;
+  useEffect(() => {
+    const storedUser = localStorage.getItem(STORAGE_KEY);
+    const storedToken = localStorage.getItem(TOKEN_KEY);
+    if (storedUser && storedToken) {
+      setUser(JSON.parse(storedUser) as AuthUser);
+      setAccessToken(storedToken);
     }
+    setIsInitializing(false);
+  }, []);
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  };
-
-  const clearSession = () => {
-    setUser(null);
-    setAccessToken(null);
-    setRefreshToken(null);
-    persistSession(null);
-  };
-
-  const loginMock = (email: string, name?: string, avatar?: string) => {
-    const u: AuthUser = { email, name, avatar };
+  const completeAuth = (session: Session) => {
+    const u: AuthUser = {
+      id: session.user.id,
+      username: session.user.username,
+      email: session.user.email,
+      name: session.user.username,
+      avatar: session.user.profileImage,
+      profileImage: session.user.profileImage,
+      authProvider: session.user.authProvider ?? "local",
+    };
     setUser(u);
+    setAccessToken(session.token);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
+    localStorage.setItem(TOKEN_KEY, session.token);
   };
 
   const updateProfile = (updates: Pick<AuthUser, "name" | "avatar">) => {
     setUser((prev) => {
       if (!prev) return prev;
-      const nextUser: AuthUser = {
+      const next: AuthUser = {
         ...prev,
         name: updates.name,
         avatar: updates.avatar,
-        username: updates.name,
         profileImage: updates.avatar,
       };
-
-      if (accessToken && refreshToken) {
-        persistSession({
-          user: nextUser,
-          accessToken,
-          refreshToken,
-        });
-      }
-
-      return nextUser;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return next;
     });
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // proceed with cleanup even if server call fails
+    }
     setUser(null);
+    setAccessToken(null);
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(TOKEN_KEY);
   };
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       accessToken,
-      refreshToken,
       isAuthenticated: !!user && !!accessToken,
       isInitializing,
       completeAuth,
       updateProfile,
       logout,
     }),
-    [user, accessToken, refreshToken, isInitializing]
+    [user, accessToken, isInitializing]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
