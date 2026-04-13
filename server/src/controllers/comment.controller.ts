@@ -29,9 +29,10 @@ export async function createComment(req: Request, res: Response): Promise<void> 
   const comment = await Comment.create({ postId, author: authorId, text });
   await comment.populate("author", "username");
 
-  await Post.findByIdAndUpdate(postId, { $inc: { commentsCount: 1 } });
+  const commentsCount = await Comment.countDocuments({ postId });
+  await Post.findByIdAndUpdate(postId, { $set: { commentsCount } });
 
-  res.status(201).json(comment);
+  res.status(201).json({ comment, commentsCount });
 }
 
 export async function deleteComment(req: Request, res: Response): Promise<void> {
@@ -47,8 +48,11 @@ export async function deleteComment(req: Request, res: Response): Promise<void> 
     return;
   }
 
+  const postId = comment.postId;
   await comment.deleteOne();
-  await Post.findByIdAndUpdate(comment.postId, { $inc: { commentsCount: -1 } });
 
-  res.status(200).json({ message: "Comment deleted" });
+  const commentsCount = await Comment.countDocuments({ postId });
+  await Post.findByIdAndUpdate(postId, { $set: { commentsCount } });
+
+  res.status(200).json({ message: "Comment deleted", commentsCount });
 }

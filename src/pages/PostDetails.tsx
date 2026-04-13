@@ -23,11 +23,15 @@ export default function PostDetails() {
     navigate("/home");
   };
 
-  const handleToggleLike = () => {
+  const handleToggleLike = async () => {
     if (!post) return;
-    const updated = toggleLike(post.id);
-    if (!updated) return;
-    setPosts((prev) => prev.map((p) => (p.id === post.id ? updated : p)));
+    try {
+      const updated = await toggleLike(post.id);
+      if (!updated) return;
+      setPosts((prev) => prev.map((p) => (p.id === post.id ? updated : p)));
+    } catch {
+      // keep existing UI state on failure
+    }
   };
 
   return (
@@ -49,7 +53,7 @@ export default function PostDetails() {
           <div className="flex items-center gap-2">
 
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate('/home')}
               className="rounded-2xl bg-white/10 border border-white/10 px-4 py-2 text-sm hover:bg-white/15"
             >
               Back
