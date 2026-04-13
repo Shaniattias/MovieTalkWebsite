@@ -1,3 +1,4 @@
+import api from "./api";
 import type { Post } from "../types/Post";
 
 // ─── Public input/output types ───────────────────────────────────────────────
@@ -264,8 +265,7 @@ export function getPostById(id: string): Post | null {
 }
 
 export async function createPostAsync(input: CreatePostInput, author: CurrentUser): Promise<Post> {
-  const token = getAccessToken();
-  if (!token) {
+  if (!getAccessToken()) {
     throw new Error("You must be logged in to create a post.");
   }
 
@@ -276,18 +276,11 @@ export async function createPostAsync(input: CreatePostInput, author: CurrentUse
     formData.append("image", input.imageFile);
   }
 
-  const res = await fetch(`${API_BASE_URL}/posts`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
+  const response = await api.post("/posts", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
   });
 
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({ message: "Failed to create post" }));
-    throw new Error(errorBody.message || "Failed to create post");
-  }
-
-  const backendPost = (await res.json()) as BackendPost;
+  const backendPost = response.data as BackendPost;
   const createdPost = mapBackendPost(backendPost, author);
   const existing = loadFromStorage();
   saveToStorage([createdPost, ...existing]);
@@ -299,8 +292,7 @@ export async function updatePostAsync(
   input: UpdatePostInput,
   fallbackAuthor?: CurrentUser
 ): Promise<Post | null> {
-  const token = getAccessToken();
-  if (!token) {
+  if (!getAccessToken()) {
     throw new Error("You must be logged in to update a post.");
   }
 
@@ -311,20 +303,17 @@ export async function updatePostAsync(
     formData.append("image", input.imageFile);
   }
 
-  const res = await fetch(`${API_BASE_URL}/posts/${id}`, {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  });
-
-  if (res.status === 404) return null;
-
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({ message: "Failed to update post" }));
-    throw new Error(errorBody.message || "Failed to update post");
+  let response;
+  try {
+    response = await api.put(`/posts/${id}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  } catch (err: any) {
+    if (err?.response?.status === 404) return null;
+    throw err;
   }
 
-  const backendPost = (await res.json()) as BackendPost;
+  const backendPost = response.data as BackendPost;
   const updatedPost = mapBackendPost(backendPost, fallbackAuthor);
   const posts = loadFromStorage();
   const next = posts.map((p) => (p.id === id ? updatedPost : p));
