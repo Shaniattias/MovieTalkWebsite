@@ -7,6 +7,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { GoogleButton } from "../components/ui/GoogleButton";
 import { authApi } from "../lib/auth";
+import { useGoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../context/AuthContext";
 
 const registerSchema = z.object({
@@ -22,13 +23,12 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function Register() {
   const navigate = useNavigate();
-  const { loginMock } = useAuth();
+  const { completeAuth } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<string | undefined>();
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -57,13 +57,13 @@ export default function Register() {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await authApi.register({
+      const session = await authApi.register({
         name: data.name,
         email: data.email,
         password: data.password,
       });
       if (result.success) {
-        loginMock(data.email, data.name, avatar, result.token);
+        loginMock(data.email, data.name, avatar);
         navigate("/home");
       } else setError("Registration failed. Please try again.");
     } catch {
@@ -73,16 +73,34 @@ export default function Register() {
     }
   };
 
-  const handleGoogleSignup = async () => {
-    setIsGoogleLoading(true);
-    setError(null);
-    try {
-      await authApi.oauthLogin("google");
-    } catch {
-      setError("Failed to connect with Google.");
-    } finally {
+  const signupWithGoogle = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        const session = await authApi.googleLogin(tokenResponse.access_token);
+        completeAuth(session);
+        navigate("/home");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to connect with Google.");
+      } finally {
+        setIsGoogleLoading(false);
+      }
+    },
+    onError: () => {
+      setError("Google signup failed. Please try again.");
       setIsGoogleLoading(false);
-    }
+    },
+    onNonOAuthError: (err) => {
+      if (err.type !== "popup_closed") {
+        setError("Google signup was cancelled or failed.");
+      }
+      setIsGoogleLoading(false);
+    },
+  });
+
+  const handleGoogleSignup = () => {
+    setError(null);
+    setIsGoogleLoading(true);
+    signupWithGoogle();
   };
 
   const inputClass =

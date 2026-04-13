@@ -1,16 +1,8 @@
-import api from "./api";
-
 export const authApi = {
   login: async (credentials: { email: string; password: string }) => {
-    const response = await api.post("/auth/login", {
-      email: credentials.email,
-      password: credentials.password,
-    });
-    return { success: true, token: response.data.token, user: response.data.user };
-  },
-
-  logout: async () => {
-    await api.post("/auth/logout");
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    console.log("Login attempt with:", credentials.email);
+    return { success: true, user: { email: credentials.email } };
   },
 
   oauthLogin: async (provider: "google") => {
@@ -20,11 +12,8 @@ export const authApi = {
   },
 
   register: async (data: { name: string; email: string; password: string }) => {
-    const response = await api.post("/auth/register", {
-      username: data.name,
-      email: data.email,
-      password: data.password,
-    });
-    return { success: true, token: response.data.token, user: response.data.user };
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    console.log("Registration attempt with:", data.email);
+    return { success: true, user: { name: data.name, email: data.email } };
   },
 };

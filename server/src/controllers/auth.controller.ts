@@ -1,27 +1,9 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import { User } from "../models/User";
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET as string;
-const ACCESS_TOKEN_EXPIRES_IN = "15m";
-const REFRESH_TOKEN_EXPIRES_IN = "7d";
-
-const REFRESH_COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: (process.env.NODE_ENV === "production" ? "none" : "lax") as "none" | "lax",
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-};
-
-function signAccessToken(userId: string): string {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES_IN });
-}
-
-function signRefreshToken(userId: string): string {
-  return jwt.sign({ userId }, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
-}
+const JWT_EXPIRES_IN = "1h";
 
 export async function register(req: Request, res: Response): Promise<void> {
   const { username, email, password } = req.body;
@@ -38,18 +20,12 @@ export async function register(req: Request, res: Response): Promise<void> {
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const refreshToken = signRefreshToken("temp");
+  const user = await User.create({ username, email, passwordHash });
 
-  const user = await User.create({ username, email, passwordHash, refreshToken });
+  const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
-  const finalRefreshToken = signRefreshToken(user._id.toString());
-  await User.findByIdAndUpdate(user._id, { refreshToken: finalRefreshToken });
-
-  const accessToken = signAccessToken(user._id.toString());
-
-  res.cookie("refreshToken", finalRefreshToken, REFRESH_COOKIE_OPTIONS);
   res.status(201).json({
-    token: accessToken,
+    token,
     user: { id: user._id, username: user.username, email: user.email },
   });
 }
@@ -62,9 +38,14 @@ export async function login(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email: String(email).toLowerCase() });
   if (!user) {
     res.status(401).json({ message: "Invalid credentials" });
+    return;
+  }
+
+  if (!user.passwordHash) {
+    res.status(400).json({ message: "This account uses Google sign-in" });
     return;
   }
 
@@ -74,14 +55,10 @@ export async function login(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const accessToken = signAccessToken(user._id.toString());
-  const refreshToken = signRefreshToken(user._id.toString());
+  const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
-  await User.findByIdAndUpdate(user._id, { refreshToken });
-
-  res.cookie("refreshToken", refreshToken, REFRESH_COOKIE_OPTIONS);
   res.status(200).json({
-    token: accessToken,
+    token,
     user: { id: user._id, username: user.username, email: user.email },
   });
 }

@@ -43,6 +43,27 @@ export default defineConfig([
 ])
 ```
 
+## Environment Variables
+
+Create a frontend `.env` file in the project root with:
+
+```env
+VITE_API_URL=http://localhost:5000/api
+VITE_GOOGLE_CLIENT_ID=your_google_web_client_id_here
+```
+
+Create `server/.env` with at least:
+
+```env
+PORT=5000
+MONGO_URI=your_mongodb_uri
+JWT_SECRET=your_jwt_secret
+JWT_REFRESH_SECRET=your_refresh_secret
+GOOGLE_CLIENT_ID=your_google_web_client_id_here
+```
+
+Google login requires the same `GOOGLE_CLIENT_ID` value on both frontend and backend.
+
 You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
 ```js
