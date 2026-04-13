@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import path from "path";
 import authRoutes from "./routes/auth.routes";
 import postRoutes from "./routes/post.routes";
+import commentRoutes from "./routes/comment.routes";
 
 const app = express();
 
@@ -18,5 +19,6 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/posts", postRoutes);
+app.use("/api/comments", commentRoutes);
 
 export default app;

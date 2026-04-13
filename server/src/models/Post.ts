@@ -5,6 +5,7 @@ export interface IPost extends Document {
   title: string;
   text: string;
   imageUrl?: string;
+  commentsCount: number;
 }
 
 const postSchema = new Schema<IPost>(
@@ -13,6 +14,7 @@ const postSchema = new Schema<IPost>(
     title: { type: String, required: true, trim: true },
     text: { type: String, required: true, trim: true },
     imageUrl: { type: String },
+    commentsCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
