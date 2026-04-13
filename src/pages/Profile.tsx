@@ -20,8 +20,8 @@ export default function Profile() {
     return posts.filter((post) => post.author.email === user.email);
   }, [posts, user]);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate("/login");
   };
 
