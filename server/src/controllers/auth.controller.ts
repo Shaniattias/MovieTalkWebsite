@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { User } from "../models/User";
+import { fallbackUsername, verifyGoogleAccessToken } from "../services/auth.service";
 
 type AuthRequest = Request & {
   file?: Express.Multer.File;
@@ -123,6 +124,65 @@ export async function login(req: Request, res: Response): Promise<void> {
       authProvider: user.authProvider ?? "local",
     },
   });
+}
+
+export async function googleAuth(req: Request, res: Response): Promise<void> {
+  const secrets = getAuthSecrets(res);
+  if (!secrets) return;
+
+  const { accessToken } = req.body;
+  if (!accessToken) {
+    res.status(400).json({ message: "Google access token is required" });
+    return;
+  }
+
+  try {
+    const googleUser = await verifyGoogleAccessToken(String(accessToken));
+    let user = await User.findOne({ email: googleUser.email });
+
+    if (!user) {
+      const passwordHash = await bcrypt.hash(`google-${googleUser.googleId}`, 10);
+      user = await User.create({
+        username: fallbackUsername(googleUser.name, googleUser.email),
+        email: googleUser.email,
+        passwordHash,
+        profileImage: googleUser.picture,
+        authProvider: "google",
+      });
+    } else {
+      let changed = false;
+      if (!user.profileImage && googleUser.picture) {
+        user.profileImage = googleUser.picture;
+        changed = true;
+      }
+      if (user.authProvider !== "google") {
+        user.authProvider = "google";
+        changed = true;
+      }
+      if (changed) {
+        await user.save();
+      }
+    }
+
+    const authUser = user;
+    const token = signAccessToken(authUser._id.toString(), secrets.jwtSecret);
+    const refreshToken = signRefreshToken(authUser._id.toString(), secrets.refreshSecret);
+    await User.findByIdAndUpdate(authUser._id, { refreshToken });
+
+    res.cookie("refreshToken", refreshToken, REFRESH_COOKIE_OPTIONS);
+    res.status(200).json({
+      token,
+      user: {
+        id: authUser._id,
+        username: authUser.username,
+        email: authUser.email,
+        profileImage: authUser.profileImage,
+        authProvider: authUser.authProvider ?? "google",
+      },
+    });
+  } catch {
+    res.status(401).json({ message: "Invalid Google credential" });
+  }
 }
 
 export async function updateProfile(req: Request, res: Response): Promise<void> {
