@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Search, Plus, Heart, MessageCircle, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getAllPosts, toggleLike, type Post } from "../lib/posts";
+import { fetchFeedPosts, toggleLike, type Post } from "../lib/posts";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -12,7 +12,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!user) return;
-    setPosts(getAllPosts(user));
+    fetchFeedPosts().then(setPosts).catch(console.error);
   }, [user]);
 
   const handleToggleLike = async (postId: string) => {
