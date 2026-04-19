@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { Post } from "../models/Post";
+import { Like } from "../models/Like";
 
 const DEFAULT_LIMIT = 10;
 
@@ -7,6 +8,8 @@ export async function getPosts(req: Request, res: Response): Promise<void> {
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
   const limit = Math.max(1, parseInt(req.query.limit as string) || DEFAULT_LIMIT);
   const skip = (page - 1) * limit;
+
+  const userId = (req as any).userId as string | undefined;
 
   const [posts, total] = await Promise.all([
     Post.find()
@@ -17,7 +20,19 @@ export async function getPosts(req: Request, res: Response): Promise<void> {
     Post.countDocuments(),
   ]);
 
-  res.status(200).json({ posts, total, page, limit });
+  let likedSet = new Set<string>();
+  if (userId && posts.length > 0) {
+    const postIds = posts.map((p) => p._id);
+    const likes = await Like.find({ userId, postId: { $in: postIds } }).select("postId");
+    likes.forEach((l) => likedSet.add(l.postId.toString()));
+  }
+
+  const postsWithLiked = posts.map((p) => ({
+    ...p.toObject(),
+    liked: likedSet.has(p._id.toString()),
+  }));
+
+  res.status(200).json({ posts: postsWithLiked, total, page, limit });
 }
 
 export async function getPostById(req: Request, res: Response): Promise<void> {

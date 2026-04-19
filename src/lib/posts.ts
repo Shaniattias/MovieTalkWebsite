@@ -59,6 +59,7 @@ type BackendPost = {
   imageUrl?: string;
   likesCount?: number;
   commentsCount?: number;
+  liked?: boolean;
   createdAt: string;
   author:
     | string
@@ -90,7 +91,7 @@ function mapBackendPost(post: BackendPost, fallbackAuthor?: CurrentUser): Post {
     imageUrl: toAbsoluteMediaUrl(post.imageUrl),
     likesCount: post.likesCount ?? 0,
     commentsCount: post.commentsCount ?? 0,
-    liked: false,
+    liked: post.liked ?? false,
   };
 }
 
@@ -254,6 +255,19 @@ function ensureSeed(): Post[] {
 export function getAllPosts(currentUser?: CurrentUser | null): Post[] {
   ensureSeed();
   return syncCurrentUserAuthorData(currentUser ?? null);
+}
+
+/**
+ * GET /api/posts — fetch all posts from the server, sorted newest first.
+ * Saves results to localStorage so toggleLike and syncPostCommentsCount
+ * can still locate posts by id.
+ */
+export async function fetchFeedPosts(): Promise<Post[]> {
+  const response = await api.get("/posts");
+  const { posts } = response.data as { posts: BackendPost[] };
+  const mapped = posts.map((p) => mapBackendPost(p));
+  saveToStorage(mapped);
+  return mapped;
 }
 
 /**

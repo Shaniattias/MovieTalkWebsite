@@ -16,13 +16,15 @@ export async function toggleLike(req: Request, res: Response): Promise<void> {
 
   if (existing) {
     await existing.deleteOne();
-    await Post.findByIdAndUpdate(postId, { $inc: { likesCount: -1 } });
-    res.status(200).json({ liked: false, likesCount: Math.max(0, post.likesCount - 1) });
   } else {
     await Like.create({ postId, userId });
-    await Post.findByIdAndUpdate(postId, { $inc: { likesCount: 1 } });
-    res.status(200).json({ liked: true, likesCount: post.likesCount + 1 });
   }
+
+  const liked = !existing;
+  const likesCount = await Like.countDocuments({ postId });
+  await Post.findByIdAndUpdate(postId, { $set: { likesCount } });
+
+  res.status(200).json({ liked, likesCount });
 }
 
 export async function getLikeStatus(req: Request, res: Response): Promise<void> {
