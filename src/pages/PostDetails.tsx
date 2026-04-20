@@ -78,8 +78,16 @@ export default function PostDetails() {
    
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-lg font-semibold">
-                  {post.author.username.slice(0, 1).toUpperCase()}
+                <div className="h-12 w-12 rounded-3xl bg-white/10 border border-white/10 flex items-center justify-center text-lg font-semibold">
+                  {post.author.avatarUrl ? (
+                    <img
+                      src={post.author.avatarUrl}
+                      alt={`${post.author.username} avatar`}
+                      className="h-full w-full object-cover rounded-3xl"
+                    />
+                  ) : (
+                    post.author.username.slice(0, 1).toUpperCase()
+                  )}
                 </div>
                 <div>
                   <div className="font-semibold">{post.author.username}</div>

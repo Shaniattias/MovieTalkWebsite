@@ -51,12 +51,12 @@ export default function Home() {
       <div className="relative z-10">
         <header className="sticky top-0 z-20 h-16 border-b border-white/10 bg-black/35 backdrop-blur-xl">
           <div className="relative mx-auto flex h-full max-w-6xl items-center justify-between px-4">
-            <div className="z-10 flex items-center">
+            <div className="z-10 flex items-center gap-2">
               <img
-                src="/images/logo2.png"
+                src="/images/logo.png"
                 alt="MovieTalk"
-                className="h-16 w-35 object-contain"
-              />
+                className="h-10 w-10 object-contain" />
+               <span className="text-white text-xl font-semibold"> MovieTalk </span>
             </div>
 
             <div className="absolute left-1/2 top-1/2 z-0 flex w-[min(44vw,420px)] min-w-[170px] -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 backdrop-blur">
@@ -81,7 +81,7 @@ export default function Home() {
               <button
                 onClick={() => navigate("/profile")}
                 aria-label="Go to profile"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/10 hover:bg-white/20 transition"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-3xl border border-white/10 bg-white/10 hover:bg-white/20 transition"
               >
                 <UserRound className="h-5 w-5 text-white/90" />
               </button>
@@ -104,12 +104,12 @@ export default function Home() {
 
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="h-11 w-11 rounded-2xl border border-white/20 bg-black/20 flex items-center justify-center text-sm font-semibold shadow-inner shadow-black/25">
+                      <div className="h-11 w-11 rounded-3xl border border-white/20 bg-black/20 flex items-center justify-center text-sm font-semibold shadow-inner shadow-black/25">
                         {p.author.avatarUrl ? (
                           <img
                             src={p.author.avatarUrl}
                             alt={`${p.author.username} avatar`}
-                            className="h-full w-full object-cover rounded-2xl"
+                            className="h-full w-full object-cover rounded-3xl"
                           />
                         ) : (
                           p.author.username.slice(0, 1).toUpperCase()
