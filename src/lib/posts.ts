@@ -329,8 +329,22 @@ export async function updatePostAsync(
  * DELETE /posts/:id
  * Removes a post by id.
  */
-export function deletePost(id: string): void {
-  saveToStorage(loadFromStorage().filter((p) => p.id !== id));
+export async function deletePost(id: string): Promise<boolean> {
+  if (!getAccessToken()) {
+    throw new Error("You must be logged in to delete a post.");
+  }
+
+  try {
+    await api.delete(`/posts/${id}`);
+    saveToStorage(loadFromStorage().filter((p) => p.id !== id));
+    return true;
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      saveToStorage(loadFromStorage().filter((p) => p.id !== id));
+      return false;
+    }
+    throw error;
+  }
 }
 
 /**

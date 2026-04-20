@@ -17,10 +17,15 @@ export default function PostDetails() {
 
   const post = useMemo(() => posts.find((p) => p.id === id), [posts, id]);
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!post) return;
-    deletePost(post.id);
-    navigate("/home");
+    try {
+      await deletePost(post.id);
+      setPosts((prev) => prev.filter((p) => p.id !== post.id));
+      navigate("/home");
+    } catch (error) {
+      console.error("Failed to delete post:", error);
+    }
   };
 
   const handleToggleLike = async () => {
@@ -96,9 +101,9 @@ export default function PostDetails() {
                         </button>
 
                         <button
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            handleDelete();
+                            await handleDelete();
                           }}
                           className="inline-flex items-center gap-1 rounded-xl border border-red-400/30 bg-red-500/20 px-2.5 py-1.5 text-xs text-red-100 hover:bg-red-500/50 transition"
                         >

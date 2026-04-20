@@ -1,8 +1,11 @@
 import { Request, Response } from "express";
 import { Post } from "../models/Post";
 import { Like } from "../models/Like";
+import fs from "fs";
+import path from "path";
 
 const DEFAULT_LIMIT = 10;
+const POST_IMAGES_DIR = path.resolve(__dirname, "../../uploads/post-images");
 
 export async function getPosts(req: Request, res: Response): Promise<void> {
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
@@ -96,18 +99,41 @@ export async function updatePost(req: Request, res: Response): Promise<void> {
 }
 
 export async function deletePost(req: Request, res: Response): Promise<void> {
-  const post = await Post.findById(req.params.id);
+  try {
+    const post = await Post.findById(req.params.id);
 
-  if (!post) {
-    res.status(404).json({ message: "Post not found" });
-    return;
+    if (!post) {
+      res.status(404).json({ message: "Post not found" });
+      return;
+    }
+
+    if (post.author.toString() !== (req as any).userId) {
+      res.status(403).json({ message: "Not authorized to delete this post" });
+      return;
+    }
+
+    if (post.imageUrl) {
+      const imageFileName = path.basename(post.imageUrl);
+      const candidatePath = path.resolve(POST_IMAGES_DIR, imageFileName);
+      const isInsideUploadsDir =
+        candidatePath === POST_IMAGES_DIR || candidatePath.startsWith(`${POST_IMAGES_DIR}${path.sep}`);
+
+      if (isInsideUploadsDir) {
+        try {
+          await fs.promises.unlink(candidatePath);
+        } catch (error: unknown) {
+          const fsError = error as NodeJS.ErrnoException;
+          if (fsError.code !== "ENOENT") {
+            console.error("Failed to delete post image:", fsError);
+          }
+        }
+      }
+    }
+
+    await post.deleteOne();
+    res.status(200).json({ message: "Post deleted" });
+  } catch (error) {
+    console.error("deletePost error:", error);
+    res.status(500).json({ message: "Failed to delete post" });
   }
-
-  if (post.author.toString() !== (req as any).userId) {
-    res.status(403).json({ message: "Not authorized to delete this post" });
-    return;
-  }
-
-  await post.deleteOne();
-  res.status(200).json({ message: "Post deleted" });
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { LogOut, Plus, UserPen } from "lucide-react";
-import { getAllPosts, type Post } from "../lib/posts";
+import { fetchFeedPosts, type Post } from "../lib/posts";
 
 
 export default function Profile() {
@@ -12,7 +12,7 @@ export default function Profile() {
 
   useEffect(() => {
     if (!user) return;
-    setPosts(getAllPosts(user));
+    fetchFeedPosts().then(setPosts).catch(console.error);
   }, [user]);
 
   const userPosts = useMemo(() => {
