@@ -4,7 +4,7 @@ import { Post } from "../models/Post";
 
 export async function getComments(req: Request, res: Response): Promise<void> {
   const comments = await Comment.find({ postId: req.params.postId })
-    .populate("author", "username")
+    .populate("author", "username profileImage")
     .sort({ createdAt: 1 });
 
   res.status(200).json(comments);
@@ -27,7 +27,7 @@ export async function createComment(req: Request, res: Response): Promise<void> 
   }
 
   const comment = await Comment.create({ postId, author: authorId, text });
-  await comment.populate("author", "username");
+  await comment.populate("author", "username profileImage");
 
   const commentsCount = await Comment.countDocuments({ postId });
   await Post.findByIdAndUpdate(postId, { $set: { commentsCount } });

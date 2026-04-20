@@ -17,10 +17,15 @@ export default function PostDetails() {
 
   const post = useMemo(() => posts.find((p) => p.id === id), [posts, id]);
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!post) return;
-    deletePost(post.id);
-    navigate("/home");
+    try {
+      await deletePost(post.id);
+      setPosts((prev) => prev.filter((p) => p.id !== post.id));
+      navigate("/home");
+    } catch (error) {
+      console.error("Failed to delete post:", error);
+    }
   };
 
   const handleToggleLike = async () => {
@@ -73,8 +78,16 @@ export default function PostDetails() {
    
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-lg font-semibold">
-                  {post.author.username.slice(0, 1).toUpperCase()}
+                <div className="h-12 w-12 rounded-3xl bg-white/10 border border-white/10 flex items-center justify-center text-lg font-semibold">
+                  {post.author.avatarUrl ? (
+                    <img
+                      src={post.author.avatarUrl}
+                      alt={`${post.author.username} avatar`}
+                      className="h-full w-full object-cover rounded-3xl"
+                    />
+                  ) : (
+                    post.author.username.slice(0, 1).toUpperCase()
+                  )}
                 </div>
                 <div>
                   <div className="font-semibold">{post.author.username}</div>
@@ -96,9 +109,9 @@ export default function PostDetails() {
                         </button>
 
                         <button
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            handleDelete();
+                            await handleDelete();
                           }}
                           className="inline-flex items-center gap-1 rounded-xl border border-red-400/30 bg-red-500/20 px-2.5 py-1.5 text-xs text-red-100 hover:bg-red-500/50 transition"
                         >

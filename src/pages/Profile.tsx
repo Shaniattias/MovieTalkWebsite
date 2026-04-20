@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { LogOut, Plus, UserPen } from "lucide-react";
-import { getAllPosts, type Post } from "../lib/posts";
+import { fetchFeedPosts, type Post } from "../lib/posts";
 
 
 export default function Profile() {
@@ -12,7 +12,7 @@ export default function Profile() {
 
   useEffect(() => {
     if (!user) return;
-    setPosts(getAllPosts(user));
+    fetchFeedPosts().then(setPosts).catch(console.error);
   }, [user]);
 
   const userPosts = useMemo(() => {
@@ -116,9 +116,7 @@ export default function Profile() {
                       alt={post.title}
                       className="h-36 w-full rounded-xl object-cover mb-3"
                     />
-                  ) : (
-                    <div className="h-36 rounded-xl bg-black/30 mb-3" />
-                  )}
+                  ) : null}
                   <div className="font-semibold text-sm">{post.title}</div>
                   <p className="text-xs text-white/70 mt-1 line-clamp-2">{post.text}</p>
                 </div>

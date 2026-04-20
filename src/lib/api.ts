@@ -1,18 +1,26 @@
 import axios from "axios";
 import type { AxiosRequestConfig } from "axios";
 
-const rawApiUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:5001/api").replace(/\/$/, "");
-const API_BASE_URL = rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`;
+const rawApiUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:5000/api").replace(/\/$/, "");
+export const API_BASE_URL = rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`;
+export const API_ORIGIN = new URL(API_BASE_URL).origin;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: { "Content-Type": "application/json" },
   withCredentials: true,
 });
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("movietalk_token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
+
+  const isFormData = typeof FormData !== "undefined" && config.data instanceof FormData;
+  if (isFormData) {
+    delete config.headers["Content-Type"];
+  } else if (!config.headers["Content-Type"]) {
+    config.headers["Content-Type"] = "application/json";
+  }
+
   return config;
 });
 

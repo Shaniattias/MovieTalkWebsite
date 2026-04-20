@@ -96,7 +96,7 @@ export default function CreatePost() {
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
               <input
                 type="file"
-                accept="image/*"
+                accept=".jpg,.jpeg,.png,image/jpeg,image/png"
                 onChange={handleImageChange}
                 className="block w-full text-sm file:mr-4 file:rounded-xl file:border-0 file:bg-white/10 file:px-4 file:py-2 file:text-white hover:file:bg-white/15"
               />
