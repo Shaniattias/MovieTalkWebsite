@@ -8,15 +8,15 @@ import {
   deletePost,
 } from "../controllers/post.controller";
 import { authMiddleware, optionalAuthMiddleware } from "../middleware/auth.middleware";
-import { upload } from "../middleware/upload.middleware";
+import { uploadPostImage } from "../middleware/upload.middleware";
 
 const router = Router();
 
 router.get("/", optionalAuthMiddleware, getPosts);
 router.get("/user/:userId", getPostsByUser);
 router.get("/:id", getPostById);
-router.post("/", authMiddleware, upload.single("image"), createPost);
-router.put("/:id", authMiddleware, upload.single("image"), updatePost);
+router.post("/", authMiddleware, uploadPostImage.single("image"), createPost);
+router.put("/:id", authMiddleware, uploadPostImage.single("image"), updatePost);
 router.delete("/:id", authMiddleware, deletePost);
 
 export default router;

@@ -46,9 +46,7 @@ export async function register(req: Request, res: Response): Promise<void> {
   if (!secrets) return;
 
   const { username, email, password } = req.body;
-  const profileImageFromFile = authReq.file ? `/uploads/profile/${authReq.file.filename}` : undefined;
-  const profileImageFromBody = typeof req.body.profileImage === "string" ? req.body.profileImage : undefined;
-  const profileImage = profileImageFromFile || profileImageFromBody;
+  const profileImage = authReq.file ? `/uploads/profile-images/${authReq.file.filename}` : undefined;
 
   if (!username || !email || !password) {
     res.status(400).json({ message: "username, email and password are required" });
@@ -186,41 +184,44 @@ export async function googleAuth(req: Request, res: Response): Promise<void> {
 }
 
 export async function updateProfile(req: Request, res: Response): Promise<void> {
-  const authReq = req as AuthRequest;
-  const userId = authReq.userId;
-  if (!userId) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
+  try {
+    const authReq = req as AuthRequest;
+    const userId = authReq.userId;
+    if (!userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    const { username } = req.body;
+    if (typeof username === "string" && username.trim().length > 0) {
+      user.username = username.trim();
+    }
+
+    if (authReq.file) {
+      user.profileImage = `/uploads/profile-images/${authReq.file.filename}`;
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        profileImage: user.profileImage,
+        authProvider: user.authProvider ?? "local",
+      },
+    });
+  } catch (error) {
+    console.error("updateProfile error:", error);
+    res.status(500).json({ message: "Failed to update profile" });
   }
-
-  const user = await User.findById(userId);
-  if (!user) {
-    res.status(404).json({ message: "User not found" });
-    return;
-  }
-
-  const { username } = req.body;
-  if (typeof username === "string" && username.trim().length > 0) {
-    user.username = username.trim();
-  }
-
-  if (authReq.file) {
-    user.profileImage = `/uploads/profile/${authReq.file.filename}`;
-  } else if (typeof req.body.profileImage === "string" && req.body.profileImage.trim().length > 0) {
-    user.profileImage = req.body.profileImage.trim();
-  }
-
-  await user.save();
-
-  res.status(200).json({
-    user: {
-      id: user._id,
-      username: user.username,
-      email: user.email,
-      profileImage: user.profileImage,
-      authProvider: user.authProvider ?? "local",
-    },
-  });
 }
 
 export async function refresh(req: Request, res: Response): Promise<void> {

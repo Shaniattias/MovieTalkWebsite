@@ -3,8 +3,8 @@ import path from "path";
 import fs from "fs";
 
 const UPLOADS_ROOT = path.join(__dirname, "../../uploads");
-const PROFILE_UPLOADS_DIR = path.join(UPLOADS_ROOT, "profile");
-const POST_UPLOADS_DIR = path.join(UPLOADS_ROOT, "posts");
+const PROFILE_UPLOADS_DIR = path.join(UPLOADS_ROOT, "profile-images");
+const POST_UPLOADS_DIR = path.join(UPLOADS_ROOT, "post-images");
 
 for (const dir of [UPLOADS_ROOT, PROFILE_UPLOADS_DIR, POST_UPLOADS_DIR]) {
   if (!fs.existsSync(dir)) {
@@ -12,31 +12,50 @@ for (const dir of [UPLOADS_ROOT, PROFILE_UPLOADS_DIR, POST_UPLOADS_DIR]) {
   }
 }
 
-const storage = multer.diskStorage({
-  destination: (req, _file, cb) => {
-    const destination = req.baseUrl.includes("/auth") ? PROFILE_UPLOADS_DIR : POST_UPLOADS_DIR;
-    cb(null, destination);
-  },
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const safeName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9-_]/g, "_");
-    const unique = `${Date.now()}-${safeName}${ext}`;
-    cb(null, unique);
-  },
-});
+function makeDiskStorage(targetDir: string) {
+  return multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      cb(null, targetDir);
+    },
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const safeName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9-_]/g, "_");
+      const unique = `${Date.now()}-${safeName}${ext}`;
+      cb(null, unique);
+    },
+  });
+}
+
+const imageStorageProfile = makeDiskStorage(PROFILE_UPLOADS_DIR);
+const imageStoragePost = makeDiskStorage(POST_UPLOADS_DIR);
+
+const ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png"]);
+const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/jpg", "image/png"]);
 
 const fileFilter = (
   _req: Express.Request,
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
 ) => {
-  const allowed = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
   const ext = path.extname(file.originalname).toLowerCase();
-  if (allowed.includes(ext)) {
+  const mimeType = (file.mimetype || "").toLowerCase();
+  if (ALLOWED_EXTENSIONS.has(ext) && ALLOWED_MIME_TYPES.has(mimeType)) {
     cb(null, true);
   } else {
-    cb(new Error("Only image files are allowed"));
+    cb(new Error("Only .jpg, .jpeg, and .png images are allowed"));
   }
 };
 
-export const upload = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
+const UPLOAD_LIMITS = { fileSize: 5 * 1024 * 1024 };
+
+export const uploadProfileImage = multer({
+  storage: imageStorageProfile,
+  fileFilter,
+  limits: UPLOAD_LIMITS,
+});
+
+export const uploadPostImage = multer({
+  storage: imageStoragePost,
+  fileFilter,
+  limits: UPLOAD_LIMITS,
+});
