@@ -1,4 +1,4 @@
-import api from "./api";
+import api, { API_ORIGIN } from "./api";
 
 type ApiUser = {
   id: string;
@@ -14,15 +14,7 @@ function toAbsoluteProfileImage(profileImage?: string): string | undefined {
     return profileImage;
   }
 
-  const configuredBase = import.meta.env.VITE_API_URL as string | undefined;
-  if (!configuredBase) return profileImage;
-
-  try {
-    const origin = new URL(configuredBase).origin;
-    return `${origin}${profileImage.startsWith("/") ? "" : "/"}${profileImage}`;
-  } catch {
-    return profileImage;
-  }
+  return `${API_ORIGIN}${profileImage.startsWith("/") ? "" : "/"}${profileImage}`;
 }
 
 function mapUser(user: ApiUser) {
@@ -48,9 +40,7 @@ export const authApi = {
       formData.append("profileImage", data.profileImageFile);
     }
 
-    const response = await api.post("/auth/register", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await api.post("/auth/register", formData);
 
     return { success: true, token: response.data.token, user: mapUser(response.data.user as ApiUser) };
   },
@@ -65,9 +55,7 @@ export const authApi = {
     if (data.username) formData.append("username", data.username);
     if (data.profileImageFile) formData.append("profileImage", data.profileImageFile);
 
-    const response = await api.patch("/auth/profile", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const response = await api.patch("/auth/profile", formData);
 
     return { user: mapUser(response.data.user as ApiUser) };
   },

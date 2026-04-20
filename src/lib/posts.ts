@@ -1,4 +1,4 @@
-import api from "./api";
+import api, { API_ORIGIN } from "./api";
 import type { Post } from "../types/Post";
 
 // ─── Public input/output types ───────────────────────────────────────────────
@@ -32,8 +32,6 @@ type CurrentUser = {
 // ─── Private: storage helpers ────────────────────────────────────────────────
 
 const STORAGE_KEY = "movietalk_posts";
-const API_BASE_URL_RAW = (import.meta.env.VITE_API_URL ?? "http://localhost:5001/api").replace(/\/$/, "");
-const API_BASE_URL = API_BASE_URL_RAW.endsWith("/api") ? API_BASE_URL_RAW : `${API_BASE_URL_RAW}/api`;
 
 function toAbsoluteMediaUrl(pathOrUrl?: string): string | undefined {
   if (!pathOrUrl) return undefined;
@@ -41,11 +39,7 @@ function toAbsoluteMediaUrl(pathOrUrl?: string): string | undefined {
     return pathOrUrl;
   }
 
-  try {
-    return `${new URL(API_BASE_URL).origin}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
-  } catch {
-    return pathOrUrl;
-  }
+  return `${API_ORIGIN}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
 }
 
 function getAccessToken(): string | null {
@@ -290,9 +284,7 @@ export async function createPostAsync(input: CreatePostInput, author: CurrentUse
     formData.append("image", input.imageFile);
   }
 
-  const response = await api.post("/posts", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const response = await api.post("/posts", formData);
 
   const backendPost = response.data as BackendPost;
   const createdPost = mapBackendPost(backendPost, author);
@@ -319,9 +311,7 @@ export async function updatePostAsync(
 
   let response;
   try {
-    response = await api.put(`/posts/${id}`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    response = await api.put(`/posts/${id}`, formData);
   } catch (err: any) {
     if (err?.response?.status === 404) return null;
     throw err;
