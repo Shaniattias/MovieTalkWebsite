@@ -3,26 +3,39 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Send, Trash2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import api from "../lib/api";
+import { API_ORIGIN } from "../lib/api";
 import { syncPostCommentsCount } from "../lib/posts";
 
 type Comment = {
   id: string;
-  author: { id: string; username: string };
+  author: { id: string; username: string; profileImage?: string };
   createdAt: string;
   text: string;
 };
 
 type BackendComment = {
   _id: string;
-  author: { _id: string; username: string };
+  author: { _id: string; username: string; profileImage?: string };
   text: string;
   createdAt: string;
 };
 
+function toAbsoluteProfileImage(profileImage?: string): string | undefined {
+  if (!profileImage) return undefined;
+  if (/^https?:\/\//i.test(profileImage) || profileImage.startsWith("data:")) {
+    return profileImage;
+  }
+  return `${API_ORIGIN}${profileImage.startsWith("/") ? "" : "/"}${profileImage}`;
+}
+
 function mapComment(c: BackendComment): Comment {
   return {
     id: c._id,
-    author: { id: c.author._id, username: c.author.username },
+    author: {
+      id: c.author._id,
+      username: c.author.username,
+      profileImage: toAbsoluteProfileImage(c.author.profileImage),
+    },
     text: c.text,
     createdAt: new Date(c.createdAt).toLocaleString(),
   };
@@ -139,7 +152,20 @@ export default function Comments() {
               className="rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl p-5 shadow-xl shadow-black/20"
             >
               <div className="flex items-center justify-between">
-                <div className="font-semibold">{c.author.username}</div>
+                <div className="flex items-center gap-2">
+                  {c.author.profileImage ? (
+                    <img
+                      src={c.author.profileImage}
+                      alt={`${c.author.username} avatar`}
+                      className="h-8 w-8 rounded-full object-cover border border-white/20"
+                    />
+                  ) : (
+                    <div className="h-8 w-8 rounded-full border border-white/20 bg-black/25 flex items-center justify-center text-xs font-semibold text-white/80">
+                      {c.author.username.slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="font-semibold">{c.author.username}</div>
+                </div>
                 <div className="flex items-center gap-3">
                   <div className="text-xs text-white/60">{c.createdAt}</div>
                   {user?.username === c.author.username && (
