@@ -1,4 +1,4 @@
-import api, { API_ORIGIN } from "./api";
+import api, { resolveMediaUrl } from "./api";
 
 type ApiUser = {
   id: string;
@@ -8,19 +8,10 @@ type ApiUser = {
   authProvider?: "local" | "google";
 };
 
-function toAbsoluteProfileImage(profileImage?: string): string | undefined {
-  if (!profileImage) return undefined;
-  if (/^https?:\/\//i.test(profileImage) || profileImage.startsWith("data:")) {
-    return profileImage;
-  }
-
-  return `${API_ORIGIN}${profileImage.startsWith("/") ? "" : "/"}${profileImage}`;
-}
-
 function mapUser(user: ApiUser) {
   return {
     ...user,
-    profileImage: toAbsoluteProfileImage(user.profileImage),
+    profileImage: resolveMediaUrl(user.profileImage),
     authProvider: user.authProvider ?? "local",
   };
 }

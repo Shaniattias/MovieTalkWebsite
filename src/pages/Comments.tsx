@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Send, Trash2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import api from "../lib/api";
-import { API_ORIGIN } from "../lib/api";
+import api, { resolveMediaUrl } from "../lib/api";
 import { syncPostCommentsCount } from "../lib/posts";
 
 type Comment = {
@@ -20,21 +19,13 @@ type BackendComment = {
   createdAt: string;
 };
 
-function toAbsoluteProfileImage(profileImage?: string): string | undefined {
-  if (!profileImage) return undefined;
-  if (/^https?:\/\//i.test(profileImage) || profileImage.startsWith("data:")) {
-    return profileImage;
-  }
-  return `${API_ORIGIN}${profileImage.startsWith("/") ? "" : "/"}${profileImage}`;
-}
-
 function mapComment(c: BackendComment): Comment {
   return {
     id: c._id,
     author: {
       id: c.author._id,
       username: c.author.username,
-      profileImage: toAbsoluteProfileImage(c.author.profileImage),
+      profileImage: resolveMediaUrl(c.author.profileImage),
     },
     text: c.text,
     createdAt: new Date(c.createdAt).toLocaleString(),

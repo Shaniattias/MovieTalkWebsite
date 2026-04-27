@@ -1,7 +1,7 @@
 import axios from "axios";
 import type { AxiosRequestConfig } from "axios";
 
-const rawApiUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:5000/api").replace(/\/$/, "");
+const rawApiUrl = (import.meta.env.VITE_API_URL || window.location.origin).replace(/\/$/, "");
 export const API_BASE_URL = rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`;
 export const API_ORIGIN = new URL(API_BASE_URL).origin;
 
@@ -56,5 +56,20 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+/**
+ * Converts a server-relative media path (e.g. /uploads/post-images/file.jpg)
+ * to an absolute URL using the configured backend origin.
+ * Already-absolute URLs and data: URIs are returned unchanged.
+ * Set VITE_API_URL to the backend origin for both dev and production.
+ */
+export function resolveMediaUrl(pathOrUrl?: string): string | undefined {
+  if (!pathOrUrl) return undefined;
+  if (/^https?:\/\//i.test(pathOrUrl) || pathOrUrl.startsWith("data:")) {
+    return pathOrUrl;
+  }
+  const prefix = pathOrUrl.startsWith("/") ? "" : "/";
+  return `${API_ORIGIN}${prefix}${pathOrUrl}`;
+}
 
 export default api;

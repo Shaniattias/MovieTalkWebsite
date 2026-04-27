@@ -1,4 +1,4 @@
-import api, { API_ORIGIN } from "./api";
+import api, { resolveMediaUrl } from "./api";
 import type { Post } from "../types/Post";
 
 // ─── Public input/output types ───────────────────────────────────────────────
@@ -32,15 +32,6 @@ type CurrentUser = {
 // ─── Private: storage helpers ────────────────────────────────────────────────
 
 const STORAGE_KEY = "movietalk_posts";
-
-function toAbsoluteMediaUrl(pathOrUrl?: string): string | undefined {
-  if (!pathOrUrl) return undefined;
-  if (/^https?:\/\//i.test(pathOrUrl) || pathOrUrl.startsWith("data:")) {
-    return pathOrUrl;
-  }
-
-  return `${API_ORIGIN}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
-}
 
 function getAccessToken(): string | null {
   return localStorage.getItem("movietalk_token");
@@ -76,13 +67,13 @@ function mapBackendPost(post: BackendPost, fallbackAuthor?: CurrentUser): Post {
     author: {
       id: authorObj?._id || authorObj?.id || `u-${authorEmail}`,
       username: authorObj?.username || fallbackAuthor?.name || authorEmail.split("@")[0],
-      avatarUrl: toAbsoluteMediaUrl(authorObj?.profileImage || authorObj?.avatarUrl || fallbackAuthor?.avatar || fallbackAuthor?.profileImage),
+      avatarUrl: resolveMediaUrl(authorObj?.profileImage || authorObj?.avatarUrl || fallbackAuthor?.avatar || fallbackAuthor?.profileImage),
       email: authorEmail,
     },
     createdAt: new Date(post.createdAt).toLocaleString(),
     title: post.title,
     text: post.text,
-    imageUrl: toAbsoluteMediaUrl(post.imageUrl),
+    imageUrl: resolveMediaUrl(post.imageUrl),
     likesCount: post.likesCount ?? 0,
     commentsCount: post.commentsCount ?? 0,
     liked: post.liked ?? false,
@@ -116,13 +107,13 @@ function normalizeLegacy(raw: StoredLegacyShape, index: number): Post {
       author: {
         id: raw.author.id,
         username: raw.author.username,
-        avatarUrl: raw.author.avatarUrl,
+        avatarUrl: resolveMediaUrl(raw.author.avatarUrl),
         email: raw.author.email ?? raw.authorEmail ?? "unknown@example.com",
       },
       createdAt: raw.createdAt,
       title: raw.title,
       text: raw.text,
-      imageUrl: raw.imageUrl ?? raw.poster,
+      imageUrl: resolveMediaUrl(raw.imageUrl ?? raw.poster),
       likesCount: raw.likesCount,
       commentsCount: raw.commentsCount,
       liked: raw.liked,
@@ -140,7 +131,7 @@ function normalizeLegacy(raw: StoredLegacyShape, index: number): Post {
     createdAt: raw.createdAt,
     title: raw.title,
     text: raw.text,
-    imageUrl: raw.imageUrl ?? raw.poster,
+    imageUrl: resolveMediaUrl(raw.imageUrl ?? raw.poster),
     likesCount: raw.likesCount,
     commentsCount: raw.commentsCount,
     liked: raw.liked,
