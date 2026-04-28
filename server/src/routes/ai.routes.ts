@@ -93,52 +93,63 @@ router.post("/search", authMiddleware, async (req: Request, res: Response): Prom
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-      const prompt = `You are an expert movie search assistant for a movie discussion platform.
+      const prompt = `You are an expert movie knowledge assistant for a movie discussion platform.
 
 User query: "${trimmedQuery}"
 
-━━━ STEP 1 — Understand the query ━━━
-- Detect the language (Hebrew, English, Arabic, etc.).
-- Translate it internally to English for all reasoning. Do not output the translation.
-- Identify the user's full intent, which may include one or more of:
-  * genre (action, horror, comedy, animation, thriller, romance, sci-fi, documentary, etc.)
-  * target audience (children, family, teens, adults)
-  * mood or tone (funny, scary, emotional, dark, uplifting)
-  * community reception — if the user asks for movies "with bad reviews" or "people didn't like" or "תגובות שליליות", focus on sentiment in sampleComments and likesCount
+You must follow these three steps carefully before producing any output.
 
-━━━ STEP 2 — Analyze each post using your movie knowledge ━━━
-For each post in the list below:
-a) Identify the specific movie or franchise being discussed (from title and text).
-b) Use your general knowledge to determine:
-   - Primary genre
-   - Target audience: children (3–10), family (all ages), teens (13–17), adults (18+)
+━━━ STEP A — Build a movie knowledge profile for each post ━━━
+For EVERY post in the list below:
+1. Read the post title and text. They may be in Hebrew or another language.
+2. Identify the exact movie being discussed. If the title is in a non-English language, translate it mentally to find the real English movie name.
+   Examples: "מהיר ועצבני" = Fast & Furious | "מואנה" = Moana | "הג'וקר" = Joker | "הבית הבובות" = The Doll's House
+3. Using your training knowledge about that movie, recall:
+   - Confirmed English title
+   - Genre(s): action / animation / horror / comedy / thriller / romance / sci-fi / drama / documentary
+   - Target audience: children (ages 3–10) / family (all ages) / teens (13–17) / adults (18+)
+   - MPAA or equivalent rating (G, PG, PG-13, R, etc.)
+   - Main cast members — at least 2–3 actors by name
+   - Director
    - Tone: lighthearted / dark / intense / comedic / emotional / suspenseful
-   - Themes: friendship, adventure, family, survival, fear, love, humor, etc.
-c) If sampleComments exist, infer the community sentiment: positive, negative, neutral, or mixed.
+   - Themes: friendship / adventure / family / fear / love / survival / humor / etc.
+4. If sampleComments are provided, infer community sentiment: positive / negative / neutral / mixed.
 
-━━━ STEP 3 — Match strictly ━━━
-- Include a post ONLY if the movie it discusses STRONGLY matches the user's intent.
-- Your reasoning must be based on what the movie actually IS — not on words in the post text.
-- Hard rules:
-  * "kids movie" / "סרטי ילדים" / "family movie" → ONLY children's/family films (Moana, Toy Story, Frozen, Shrek). NEVER Fast & Furious, Joker, or any adult-rated film.
-  * "action" / "סרטי אקשן" → action films for adults/teens (Mission Impossible, Fast & Furious). Not animation or romance.
-  * "horror" / "scary" / "סרט אימה" → horror or psychological thriller (The Shining, Joker, Hereditary). Not Disney.
-  * "bad reactions" / "negative comments" / "תגובות שליליות" / "אשמח שתציג לי סרט עם תגובות לא טובות" → posts where sampleComments show criticism, disappointment, or negativity, OR where likesCount is very low relative to commentsCount.
-- Exclude posts that are only partially or loosely related.
-- Prefer 2–4 strong matches over many weak ones.
-- Returning zero results is correct if nothing genuinely matches.
+━━━ STEP B — Understand the user query ━━━
+1. Detect the query language (Hebrew, English, Arabic, etc.) and translate it mentally to English.
+2. Determine what the user is looking for. It may be:
+   - Genre: "action movies", "kids movies", "horror", "comedy"
+   - Audience: "family movies", "movies for kids", "adult movies"
+   - Cast or crew: "movies with Sydney Sweeney", "Vin Diesel movies", "movies directed by Nolan"
+     → For cast queries: recall which movies that person appeared in, then check if any post discusses those movies
+   - Tone or mood: "funny movies", "scary movies", "emotional movies", "dark films"
+   - Sentiment: "movies with bad reactions", "movies people hated", "unpopular movies"
+     → Check sampleComments for criticism or disappointment, and whether likesCount is very low
+
+━━━ STEP C — Match strictly using your movie knowledge ━━━
+- Include a post ONLY if the movie it discusses STRONGLY and CONFIDENTLY fits the query.
+- Your decision must be based on what the movie actually is — never on the words written in the post.
+- Non-negotiable rules:
+  * "kids movie" / "סרטי ילדים" / "family film" → match ONLY G or PG rated children's/family animations and live-action family films (Moana, Toy Story, Frozen, Shrek, Home Alone). Fast & Furious is PG-13 action for adults — NEVER include it. Joker is R-rated — NEVER include it.
+  * "action" / "סרטי אקשן" → match action films rated PG-13 or above (Fast & Furious, Mission Impossible, John Wick). Do NOT include animation or romance.
+  * "horror" / "scary" / "סרט אימה" → match horror or dark psychological thriller (The Shining, Joker, Hereditary, Get Out). Never match Disney or family films.
+  * Cast query (e.g. "סינדי סוויני" = Sydney Sweeney) → first recall all movies Sydney Sweeney is known for (e.g. Anyone But You, Immaculate, Reality, The Housemaid), then match any post that discusses one of those specific movies.
+  * Sentiment query ("bad reviews", "תגובות שליליות", "people didn't like it") → match posts where sampleComments express criticism, dissatisfaction, or where likesCount is notably low.
+- If you are not fully confident a movie matches — exclude it.
+- Prefer returning 0 results over returning wrong results.
+- Ideal: 2–4 high-confidence matches.
 
 ━━━ POSTS ━━━
 ${JSON.stringify(compactPosts)}
 
 ━━━ OUTPUT ━━━
-Return ONLY valid JSON. No markdown. No code fences. No explanation outside the JSON.
+Return ONLY valid JSON. No markdown. No code fences. No text outside the JSON.
 
-Format:
-{"matchedPostIds":["<id>"],"reasoningSummary":"<one sentence>","queryUnderstanding":{"language":"<detected language>","intent":"<user intent in English>","genres":["<genre>"],"audience":["<audience>"],"sentiment":"positive|negative|neutral|any"}}
+Format when results exist:
+{"matchedPostIds":["<id>"],"reasoningSummary":"<one sentence explaining why these posts match>","queryUnderstanding":{"language":"<detected language>","intent":"<user intent in English>","genres":["<genre>"],"audience":["<audience>"],"sentiment":"positive|negative|neutral|any"}}
 
-If nothing matches:
-{"matchedPostIds":[],"reasoningSummary":"No posts match the query","queryUnderstanding":{"language":"<detected>","intent":"<intent>","genres":[],"audience":[],"sentiment":"any"}}`;
+Format when nothing matches or you are not confident:
+{"matchedPostIds":[],"reasoningSummary":"No posts confidently match this query","queryUnderstanding":{"language":"<detected>","intent":"<intent in English>","genres":[],"audience":[],"sentiment":"any"}}`;
 
       const result = await model.generateContent(prompt);
       const raw = stripCodeFences(result.response.text().trim());
