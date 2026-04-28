@@ -62,26 +62,39 @@ router.post("/search", authMiddleware, async (req: Request, res: Response): Prom
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-      const prompt = `You are a movie discussion search assistant for a platform where users post about movies.
+      const prompt = `You are an expert movie search assistant for a movie discussion platform.
 
 User query: "${trimmedQuery}"
 
-Available posts (JSON):
+Step 1 — Language detection and translation:
+The query may be in any language (Hebrew, Arabic, Spanish, etc.).
+Internally translate it to English before reasoning. Do not output the translation.
+
+Step 2 — For each post below, use your general movie knowledge to:
+- Identify the exact movie or franchise being discussed based on the title and text.
+- Determine that movie's: primary genre, target audience (children / family / teens / adults), tone (lighthearted / dark / intense / comedic), and main themes.
+
+Step 3 — Match strictly:
+- A post matches ONLY if the movie it discusses strongly fits the user's intent.
+- Base this on what the movie actually IS, not on words in the post text.
+- Examples of correct reasoning:
+  * Query "kids movie" or "סרטי ילדים" → match Moana, Toy Story, Finding Nemo. Do NOT match Fast & Furious, Joker, or any adult action/thriller.
+  * Query "action movie" → match Mission Impossible, Fast & Furious. Do NOT match Moana or romantic comedies.
+  * Query "horror" or "scary" → match The Shining, Joker. Do NOT match Disney or family films.
+  * Query "romantic comedy" → match When Harry Met Sally, Crazy Rich Asians. Do NOT match action or horror.
+- If a movie is only loosely related, do NOT include it.
+- It is correct and acceptable to return zero matches if nothing truly fits.
+- Prefer 2–3 accurate results over 6–8 weak ones.
+
+Available posts:
 ${JSON.stringify(compactPosts)}
 
-Instructions:
-- Understand the query semantically. For example:
-  - "kids movie" should match posts about Moana, Toy Story, Finding Nemo, etc.
-  - "action movie" should match posts about Fast and Furious, Mission Impossible, etc.
-  - "horror or scary" should match posts about Joker, The Shining, etc.
-  - "family comedy" should match posts about Home Alone, etc.
-- Pick posts whose topic matches the intent of the query, even if the exact words differ.
-- Return ONLY a valid JSON object. No markdown. No explanation. No code fences.
+Return ONLY a valid JSON object. No markdown, no explanation, no code fences.
 
-Required JSON format:
-{"matchedPostIds":["<id>"],"reason":"<brief reason>","interpretedQuery":{"genres":["<genre>"],"themes":["<theme>"],"moods":["<mood>"],"keywords":["<keyword>"]}}
+Required format:
+{"matchedPostIds":["<id>"],"reason":"<brief reason in English>","interpretedQuery":{"genres":["<genre>"],"themes":["<theme>"],"moods":["<mood>"],"keywords":["<keyword>"]}}
 
-If no posts match, return matchedPostIds as an empty array.`;
+If nothing matches, return: {"matchedPostIds":[],"reason":"No posts match the query","interpretedQuery":{"genres":[],"themes":[],"moods":[],"keywords":[]}}`;
 
       const result = await model.generateContent(prompt);
       const raw = stripCodeFences(result.response.text().trim());
