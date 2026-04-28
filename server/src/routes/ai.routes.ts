@@ -6,67 +6,30 @@ import { Like } from "../models/Like";
 
 const router = Router();
 
-interface GeminiSearchQuery {
+interface InterpretedQuery {
   genres: string[];
-  titles: string[];
   themes: string[];
   moods: string[];
   keywords: string[];
 }
 
-const GEMINI_PROMPT = `You are a movie discussion search assistant. Extract from the user's natural language query: movie genres, movie titles/franchises, themes, moods, and keywords. Return ONLY a JSON object with: { genres: string[], titles: string[], themes: string[], moods: string[], keywords: string[] }`;
-
-async function extractSearchTerms(userQuery: string): Promise<GeminiSearchQuery | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent(`${GEMINI_PROMPT}\n\nUser query: "${userQuery}"`);
-    const text = result.response.text().trim();
-
-    // Strip markdown code fences if present
-    const jsonText = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-    const parsed = JSON.parse(jsonText);
-
-    if (
-      parsed &&
-      Array.isArray(parsed.genres) &&
-      Array.isArray(parsed.titles) &&
-      Array.isArray(parsed.themes) &&
-      Array.isArray(parsed.moods) &&
-      Array.isArray(parsed.keywords)
-    ) {
-      return parsed as GeminiSearchQuery;
-    }
-    return null;
-  } catch {
-    return null;
-  }
+interface GeminiSemanticResponse {
+  matchedPostIds: string[];
+  reason: string;
+  interpretedQuery: InterpretedQuery;
 }
 
-function buildSearchQuery(extracted: GeminiSearchQuery | null, rawQuery: string) {
-  const terms: string[] = extracted
-    ? [
-        ...extracted.genres,
-        ...extracted.titles,
-        ...extracted.themes,
-        ...extracted.moods,
-        ...extracted.keywords,
-      ].filter((t) => t.length > 0)
-    : [rawQuery];
-
-  if (terms.length === 0) {
-    terms.push(rawQuery);
-  }
-
+function buildRegexFallback(rawQuery: string) {
+  const terms = rawQuery.trim().split(/\s+/).filter(Boolean);
   const orClauses = terms.flatMap((term) => {
     const regex = { $regex: term, $options: "i" };
     return [{ title: regex }, { text: regex }];
   });
+  return orClauses.length > 0 ? { $or: orClauses } : {};
+}
 
-  return { $or: orClauses };
+function stripCodeFences(text: string): string {
+  return text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
 }
 
 router.post("/search", authMiddleware, async (req: Request, res: Response): Promise<void> => {
@@ -80,13 +43,79 @@ router.post("/search", authMiddleware, async (req: Request, res: Response): Prom
   const trimmedQuery = query.trim();
   const userId = (req as any).userId as string;
 
-  const extracted = await extractSearchTerms(trimmedQuery);
-  const mongoQuery = buildSearchQuery(extracted, trimmedQuery);
+  // 1. Fetch all posts compactly for Gemini context
+  const allPosts = await Post.find({}, "_id title text").lean();
+  const compactPosts = allPosts.map((p) => ({
+    id: (p._id as any).toString(),
+    title: p.title,
+    text: p.text,
+  }));
 
-  const posts = await Post.find(mongoQuery)
-    .populate("author", "username email profileImage")
-    .sort({ createdAt: -1 });
+  let matchedIds: string[] = [];
+  let interpretedQuery: InterpretedQuery = { genres: [], themes: [], moods: [], keywords: [] };
+  let aiSucceeded = false;
 
+  // 2. Try Gemini semantic matching
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (apiKey && compactPosts.length > 0) {
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+      const prompt = `You are a movie discussion search assistant for a platform where users post about movies.
+
+User query: "${trimmedQuery}"
+
+Available posts (JSON):
+${JSON.stringify(compactPosts)}
+
+Instructions:
+- Understand the query semantically. For example:
+  - "kids movie" should match posts about Moana, Toy Story, Finding Nemo, etc.
+  - "action movie" should match posts about Fast and Furious, Mission Impossible, etc.
+  - "horror or scary" should match posts about Joker, The Shining, etc.
+  - "family comedy" should match posts about Home Alone, etc.
+- Pick posts whose topic matches the intent of the query, even if the exact words differ.
+- Return ONLY a valid JSON object. No markdown. No explanation. No code fences.
+
+Required JSON format:
+{"matchedPostIds":["<id>"],"reason":"<brief reason>","interpretedQuery":{"genres":["<genre>"],"themes":["<theme>"],"moods":["<mood>"],"keywords":["<keyword>"]}}
+
+If no posts match, return matchedPostIds as an empty array.`;
+
+      const result = await model.generateContent(prompt);
+      const raw = stripCodeFences(result.response.text().trim());
+      const parsed = JSON.parse(raw) as GeminiSemanticResponse;
+
+      if (
+        parsed &&
+        Array.isArray(parsed.matchedPostIds) &&
+        parsed.interpretedQuery &&
+        Array.isArray(parsed.interpretedQuery.genres) &&
+        Array.isArray(parsed.interpretedQuery.themes) &&
+        Array.isArray(parsed.interpretedQuery.moods) &&
+        Array.isArray(parsed.interpretedQuery.keywords)
+      ) {
+        const validIds = new Set(compactPosts.map((p) => p.id));
+        matchedIds = parsed.matchedPostIds.filter((id) => validIds.has(id));
+        interpretedQuery = parsed.interpretedQuery;
+        aiSucceeded = matchedIds.length > 0;
+      }
+    } catch {
+      // fall through to regex fallback
+    }
+  }
+
+  // 3. Fetch posts — AI results or regex fallback
+  const posts = aiSucceeded
+    ? await Post.find({ _id: { $in: matchedIds } })
+        .populate("author", "username email profileImage")
+        .sort({ createdAt: -1 })
+    : await Post.find(buildRegexFallback(trimmedQuery))
+        .populate("author", "username email profileImage")
+        .sort({ createdAt: -1 });
+
+  // 4. Add liked flag
   let likedSet = new Set<string>();
   if (posts.length > 0) {
     const postIds = posts.map((p) => p._id);
@@ -99,15 +128,17 @@ router.post("/search", authMiddleware, async (req: Request, res: Response): Prom
     liked: likedSet.has(p._id.toString()),
   }));
 
-  const queryMeta: GeminiSearchQuery = extracted ?? {
-    genres: [],
-    titles: [],
-    themes: [],
-    moods: [],
-    keywords: [trimmedQuery],
-  };
-
-  res.status(200).json({ results, query: queryMeta });
+  // titles kept as [] to stay compatible with the frontend AiSearchQuery type
+  res.status(200).json({
+    results,
+    query: {
+      genres: interpretedQuery.genres,
+      titles: [],
+      themes: interpretedQuery.themes,
+      moods: interpretedQuery.moods,
+      keywords: interpretedQuery.keywords,
+    },
+  });
 });
 
 export default router;
