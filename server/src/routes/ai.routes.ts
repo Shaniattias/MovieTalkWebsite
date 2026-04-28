@@ -3,20 +3,22 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { authMiddleware } from "../middleware/auth.middleware";
 import { Post } from "../models/Post";
 import { Like } from "../models/Like";
+import { Comment } from "../models/Comment";
 
 const router = Router();
 
-interface InterpretedQuery {
+interface QueryUnderstanding {
+  language: string;
+  intent: string;
   genres: string[];
-  themes: string[];
-  moods: string[];
-  keywords: string[];
+  audience: string[];
+  sentiment: "positive" | "negative" | "neutral" | "any";
 }
 
 interface GeminiSemanticResponse {
   matchedPostIds: string[];
-  reason: string;
-  interpretedQuery: InterpretedQuery;
+  reasoningSummary: string;
+  queryUnderstanding: QueryUnderstanding;
 }
 
 function buildRegexFallback(rawQuery: string) {
@@ -43,19 +45,48 @@ router.post("/search", authMiddleware, async (req: Request, res: Response): Prom
   const trimmedQuery = query.trim();
   const userId = (req as any).userId as string;
 
-  // 1. Fetch all posts compactly for Gemini context
-  const allPosts = await Post.find({}, "_id title text").lean();
-  const compactPosts = allPosts.map((p) => ({
-    id: (p._id as any).toString(),
-    title: p.title,
-    text: p.text,
-  }));
+  // 1. Fetch all posts with enough context for Gemini
+  const allPosts = await Post.find({}, "_id title text likesCount commentsCount").lean();
+  const allPostIds = allPosts.map((p) => (p._id as any).toString());
+
+  // 2. Fetch up to 3 comments per post for sentiment context
+  const allComments = await Comment.find(
+    { postId: { $in: allPostIds } },
+    "postId text"
+  ).lean();
+
+  const commentsByPost: Record<string, string[]> = {};
+  for (const c of allComments) {
+    const pid = (c.postId as any).toString();
+    if (!commentsByPost[pid]) commentsByPost[pid] = [];
+    if (commentsByPost[pid].length < 3) commentsByPost[pid].push(c.text as string);
+  }
+
+  const compactPosts = allPosts.map((p) => {
+    const pid = (p._id as any).toString();
+    const comments = commentsByPost[pid] ?? [];
+    const entry: Record<string, unknown> = {
+      id: pid,
+      title: p.title,
+      text: p.text,
+      likesCount: p.likesCount,
+      commentsCount: p.commentsCount,
+    };
+    if (comments.length > 0) entry.sampleComments = comments;
+    return entry;
+  });
 
   let matchedIds: string[] = [];
-  let interpretedQuery: InterpretedQuery = { genres: [], themes: [], moods: [], keywords: [] };
+  let queryUnderstanding: QueryUnderstanding = {
+    language: "unknown",
+    intent: "",
+    genres: [],
+    audience: [],
+    sentiment: "any",
+  };
   let aiSucceeded = false;
 
-  // 2. Try Gemini semantic matching
+  // 3. Try Gemini semantic matching
   const apiKey = process.env.GEMINI_API_KEY;
   if (apiKey && compactPosts.length > 0) {
     try {
@@ -66,35 +97,48 @@ router.post("/search", authMiddleware, async (req: Request, res: Response): Prom
 
 User query: "${trimmedQuery}"
 
-Step 1 — Language detection and translation:
-The query may be in any language (Hebrew, Arabic, Spanish, etc.).
-Internally translate it to English before reasoning. Do not output the translation.
+━━━ STEP 1 — Understand the query ━━━
+- Detect the language (Hebrew, English, Arabic, etc.).
+- Translate it internally to English for all reasoning. Do not output the translation.
+- Identify the user's full intent, which may include one or more of:
+  * genre (action, horror, comedy, animation, thriller, romance, sci-fi, documentary, etc.)
+  * target audience (children, family, teens, adults)
+  * mood or tone (funny, scary, emotional, dark, uplifting)
+  * community reception — if the user asks for movies "with bad reviews" or "people didn't like" or "תגובות שליליות", focus on sentiment in sampleComments and likesCount
 
-Step 2 — For each post below, use your general movie knowledge to:
-- Identify the exact movie or franchise being discussed based on the title and text.
-- Determine that movie's: primary genre, target audience (children / family / teens / adults), tone (lighthearted / dark / intense / comedic), and main themes.
+━━━ STEP 2 — Analyze each post using your movie knowledge ━━━
+For each post in the list below:
+a) Identify the specific movie or franchise being discussed (from title and text).
+b) Use your general knowledge to determine:
+   - Primary genre
+   - Target audience: children (3–10), family (all ages), teens (13–17), adults (18+)
+   - Tone: lighthearted / dark / intense / comedic / emotional / suspenseful
+   - Themes: friendship, adventure, family, survival, fear, love, humor, etc.
+c) If sampleComments exist, infer the community sentiment: positive, negative, neutral, or mixed.
 
-Step 3 — Match strictly:
-- A post matches ONLY if the movie it discusses strongly fits the user's intent.
-- Base this on what the movie actually IS, not on words in the post text.
-- Examples of correct reasoning:
-  * Query "kids movie" or "סרטי ילדים" → match Moana, Toy Story, Finding Nemo. Do NOT match Fast & Furious, Joker, or any adult action/thriller.
-  * Query "action movie" → match Mission Impossible, Fast & Furious. Do NOT match Moana or romantic comedies.
-  * Query "horror" or "scary" → match The Shining, Joker. Do NOT match Disney or family films.
-  * Query "romantic comedy" → match When Harry Met Sally, Crazy Rich Asians. Do NOT match action or horror.
-- If a movie is only loosely related, do NOT include it.
-- It is correct and acceptable to return zero matches if nothing truly fits.
-- Prefer 2–3 accurate results over 6–8 weak ones.
+━━━ STEP 3 — Match strictly ━━━
+- Include a post ONLY if the movie it discusses STRONGLY matches the user's intent.
+- Your reasoning must be based on what the movie actually IS — not on words in the post text.
+- Hard rules:
+  * "kids movie" / "סרטי ילדים" / "family movie" → ONLY children's/family films (Moana, Toy Story, Frozen, Shrek). NEVER Fast & Furious, Joker, or any adult-rated film.
+  * "action" / "סרטי אקשן" → action films for adults/teens (Mission Impossible, Fast & Furious). Not animation or romance.
+  * "horror" / "scary" / "סרט אימה" → horror or psychological thriller (The Shining, Joker, Hereditary). Not Disney.
+  * "bad reactions" / "negative comments" / "תגובות שליליות" / "אשמח שתציג לי סרט עם תגובות לא טובות" → posts where sampleComments show criticism, disappointment, or negativity, OR where likesCount is very low relative to commentsCount.
+- Exclude posts that are only partially or loosely related.
+- Prefer 2–4 strong matches over many weak ones.
+- Returning zero results is correct if nothing genuinely matches.
 
-Available posts:
+━━━ POSTS ━━━
 ${JSON.stringify(compactPosts)}
 
-Return ONLY a valid JSON object. No markdown, no explanation, no code fences.
+━━━ OUTPUT ━━━
+Return ONLY valid JSON. No markdown. No code fences. No explanation outside the JSON.
 
-Required format:
-{"matchedPostIds":["<id>"],"reason":"<brief reason in English>","interpretedQuery":{"genres":["<genre>"],"themes":["<theme>"],"moods":["<mood>"],"keywords":["<keyword>"]}}
+Format:
+{"matchedPostIds":["<id>"],"reasoningSummary":"<one sentence>","queryUnderstanding":{"language":"<detected language>","intent":"<user intent in English>","genres":["<genre>"],"audience":["<audience>"],"sentiment":"positive|negative|neutral|any"}}
 
-If nothing matches, return: {"matchedPostIds":[],"reason":"No posts match the query","interpretedQuery":{"genres":[],"themes":[],"moods":[],"keywords":[]}}`;
+If nothing matches:
+{"matchedPostIds":[],"reasoningSummary":"No posts match the query","queryUnderstanding":{"language":"<detected>","intent":"<intent>","genres":[],"audience":[],"sentiment":"any"}}`;
 
       const result = await model.generateContent(prompt);
       const raw = stripCodeFences(result.response.text().trim());
@@ -103,23 +147,21 @@ If nothing matches, return: {"matchedPostIds":[],"reason":"No posts match the qu
       if (
         parsed &&
         Array.isArray(parsed.matchedPostIds) &&
-        parsed.interpretedQuery &&
-        Array.isArray(parsed.interpretedQuery.genres) &&
-        Array.isArray(parsed.interpretedQuery.themes) &&
-        Array.isArray(parsed.interpretedQuery.moods) &&
-        Array.isArray(parsed.interpretedQuery.keywords)
+        parsed.queryUnderstanding &&
+        Array.isArray(parsed.queryUnderstanding.genres) &&
+        Array.isArray(parsed.queryUnderstanding.audience)
       ) {
-        const validIds = new Set(compactPosts.map((p) => p.id));
+        const validIds = new Set(allPostIds);
         matchedIds = parsed.matchedPostIds.filter((id) => validIds.has(id));
-        interpretedQuery = parsed.interpretedQuery;
-        aiSucceeded = matchedIds.length > 0;
+        queryUnderstanding = parsed.queryUnderstanding;
+        aiSucceeded = true;
       }
     } catch {
       // fall through to regex fallback
     }
   }
 
-  // 3. Fetch posts — AI results or regex fallback
+  // 4. Fetch full posts — AI results or regex fallback
   const posts = aiSucceeded
     ? await Post.find({ _id: { $in: matchedIds } })
         .populate("author", "username email profileImage")
@@ -128,11 +170,11 @@ If nothing matches, return: {"matchedPostIds":[],"reason":"No posts match the qu
         .populate("author", "username email profileImage")
         .sort({ createdAt: -1 });
 
-  // 4. Add liked flag
-  let likedSet = new Set<string>();
+  // 5. Add liked flag
+  const likedSet = new Set<string>();
   if (posts.length > 0) {
-    const postIds = posts.map((p) => p._id);
-    const likes = await Like.find({ userId, postId: { $in: postIds } }).select("postId");
+    const pids = posts.map((p) => p._id);
+    const likes = await Like.find({ userId, postId: { $in: pids } }).select("postId");
     likes.forEach((l) => likedSet.add(l.postId.toString()));
   }
 
@@ -141,15 +183,15 @@ If nothing matches, return: {"matchedPostIds":[],"reason":"No posts match the qu
     liked: likedSet.has(p._id.toString()),
   }));
 
-  // titles kept as [] to stay compatible with the frontend AiSearchQuery type
+  // Map to the frontend AiSearchQuery shape (genres/titles/themes/moods/keywords)
   res.status(200).json({
     results,
     query: {
-      genres: interpretedQuery.genres,
+      genres: queryUnderstanding.genres,
       titles: [],
-      themes: interpretedQuery.themes,
-      moods: interpretedQuery.moods,
-      keywords: interpretedQuery.keywords,
+      themes: queryUnderstanding.audience,
+      moods: queryUnderstanding.sentiment !== "any" ? [queryUnderstanding.sentiment] : [],
+      keywords: queryUnderstanding.intent ? [queryUnderstanding.intent] : [],
     },
   });
 });
