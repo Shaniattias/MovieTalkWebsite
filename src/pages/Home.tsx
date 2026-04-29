@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Search, Plus, Heart, MessageCircle, UserRound, Sparkles, X, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { fetchFeedPosts, toggleLike, searchPostsWithAI, type Post, type AiSearchQuery } from "../lib/posts";
+import { fetchFeedPosts, toggleLike, searchPostsWithAI, type Post } from "../lib/posts";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -10,7 +10,6 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [posts, setPosts] = useState<Post[]>([]);
   const [aiResults, setAiResults] = useState<Post[] | null>(null);
-  const [aiQueryMeta, setAiQueryMeta] = useState<AiSearchQuery | null>(null);
   const [aiSearching, setAiSearching] = useState(false);
 
   useEffect(() => {
@@ -33,9 +32,8 @@ export default function Home() {
     if (!q) return;
     setAiSearching(true);
     try {
-      const { results, query: meta } = await searchPostsWithAI(q);
+      const { results } = await searchPostsWithAI(q);
       setAiResults(results);
-      setAiQueryMeta(meta);
     } catch {
       // silently fall back to local filter
     } finally {
@@ -45,7 +43,6 @@ export default function Home() {
 
   const clearAiSearch = () => {
     setAiResults(null);
-    setAiQueryMeta(null);
   };
 
   const filtered = useMemo(() => {
@@ -125,27 +122,6 @@ export default function Home() {
           <div className="mx-auto w-full">
             <section className="space-y-6">
 
-              {aiQueryMeta !== null && (
-                <div className="flex items-center justify-between gap-3 rounded-2xl border border-purple-400/30 bg-purple-500/10 px-5 py-3 backdrop-blur">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-purple-400 shrink-0" />
-                    <span className="text-sm text-white/80">
-                      AI found <strong>{(aiResults ?? []).length}</strong> result{(aiResults ?? []).length !== 1 ? "s" : ""}
-                    </span>
-                    {[...aiQueryMeta.genres, ...aiQueryMeta.titles, ...aiQueryMeta.themes, ...aiQueryMeta.moods, ...aiQueryMeta.keywords]
-                      .filter((t) => t.length > 0)
-                      .slice(0, 6)
-                      .map((term) => (
-                        <span key={term} className="rounded-full border border-purple-400/30 bg-purple-500/20 px-2 py-0.5 text-xs text-purple-200">
-                          {term}
-                        </span>
-                      ))}
-                  </div>
-                  <button onClick={clearAiSearch} aria-label="Clear AI search" className="shrink-0">
-                    <X className="h-4 w-4 opacity-60 hover:opacity-100" />
-                  </button>
-                </div>
-              )}
 
               {(aiResults ?? filtered).map((p) => (
                 <article

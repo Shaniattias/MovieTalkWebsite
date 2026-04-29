@@ -36,6 +36,7 @@ function stripCodeFences(text: string): string {
 
 router.post("/search", authMiddleware, async (req: Request, res: Response): Promise<void> => {
   const { query } = req.body;
+  console.log("🔥 AI SEARCH ROUTE HIT:", query);
 
   if (!query || typeof query !== "string" || query.trim().length === 0) {
     res.status(400).json({ message: "query is required and must be a non-empty string" });
@@ -45,11 +46,9 @@ router.post("/search", authMiddleware, async (req: Request, res: Response): Prom
   const trimmedQuery = query.trim();
   const userId = (req as any).userId as string;
 
-  // 1. Fetch all posts with enough context for Gemini
   const allPosts = await Post.find({}, "_id title text likesCount commentsCount").lean();
   const allPostIds = allPosts.map((p) => (p._id as any).toString());
 
-  // 2. Fetch up to 3 comments per post for sentiment context
   const allComments = await Comment.find(
     { postId: { $in: allPostIds } },
     "postId text"
@@ -65,6 +64,7 @@ router.post("/search", authMiddleware, async (req: Request, res: Response): Prom
   const compactPosts = allPosts.map((p) => {
     const pid = (p._id as any).toString();
     const comments = commentsByPost[pid] ?? [];
+
     const entry: Record<string, unknown> = {
       id: pid,
       title: p.title,
@@ -72,7 +72,9 @@ router.post("/search", authMiddleware, async (req: Request, res: Response): Prom
       likesCount: p.likesCount,
       commentsCount: p.commentsCount,
     };
+
     if (comments.length > 0) entry.sampleComments = comments;
+
     return entry;
   });
 
@@ -84,137 +86,110 @@ router.post("/search", authMiddleware, async (req: Request, res: Response): Prom
     audience: [],
     sentiment: "any",
   };
+
   let aiSucceeded = false;
 
-  // 3. Try Gemini semantic matching
   const apiKey = process.env.GEMINI_API_KEY;
+
   if (apiKey && compactPosts.length > 0) {
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-      const prompt = `You are an expert multilingual movie search assistant for a movie discussion platform.
-You have deep knowledge of movies, franchises, actors, directors, genres, and audiences.
+      const prompt = `
+You are a smart movie search assistant.
 
 User query: "${trimmedQuery}"
 
-Complete ALL three steps below before producing output.
+Your job:
+Find which posts match the user query.
 
-━━━ STEP 1 — Understand the query ━━━
-a) Detect the query language (Hebrew, English, Arabic, etc.).
-b) Translate it mentally to English. Do not output the translation.
-c) Determine what the user is looking for. It may be one or more of:
-   - Genre: action / horror / comedy / romance / animation / thriller / sci-fi / drama
-   - Audience: kids / family / teens / adults
-   - Mood / tone: funny / scary / emotional / dark / uplifting / suspenseful
-   - Cast or crew: a specific actor or director name
-   - Sentiment: posts with positive or negative community reactions
-   - A specific concept or theme (sea, friendship, revenge, etc.)
-d) Build these two sets for use in Step 2:
-   EXACT_TERMS — the user's words exactly as typed
-   SYNONYM_TERMS — related words in both the query language and English. Examples:
-     "ילדים" / "kids" → children, family, animated, animation, Disney, Pixar, G-rated, PG
-     "אימה" / "horror" → scary, frightening, thriller, psychological, dark, terrifying
-     "אקשן" / "action" → fight, chase, explosion, combat, stunt, PG-13, mission
-     "מצחיק" / "funny" → comedy, humor, hilarious, laugh, witty
-     "רומנטי" / "romance" → love, relationship, affection, romantic comedy
-     "מותח" / "thriller" → suspense, tense, mystery, gripping, psychological
-     "עצוב" / "sad" → emotional, drama, tearful, heartbreaking
-     "ים" / "sea" → ocean, beach, water, waves, shore, island
+IMPORTANT:
+- Understand the meaning of the query, not just exact words.
+- Identify the movie in each post using title and text.
+- Use your general movie knowledge to infer genre, audience, tone, and themes.
+- Also support exact text search: if the query appears exactly in title, text, or sampleComments, include that post.
 
-━━━ STEP 2 — Analyze each post with THREE checks ━━━
-For each post examine ALL text fields: title, text, sampleComments.
+Examples:
+- "מהיר ועצבני" = Fast & Furious = action movie
+- "הובס ושאו" = Hobbs & Shaw = Fast & Furious spin-off = action movie
+- "מואנה" = Moana = kids / family movie
+- "שכחו אותי בבית" = Home Alone = family comedy
+- "גוקר" / "ג׳וקר" = Joker = dark drama / psychological thriller
+- "הניצוץ" = The Shining = horror
 
-CHECK A — Exact text match (highest priority):
-  Scan title + text + sampleComments for any word from EXACT_TERMS (case-insensitive).
-  If ANY exact term appears verbatim → strong match, include it.
-  Example: query "סרט חכם מאוד", comment says "סרט חכם מאוד" → include.
+User intent examples:
+- "אקשן" / "סרטי אקשן" / "פעולה" => action movies
+- "סרטי ילדים" / "ילדים" => kids or family movies
+- "אימה" / "מפחיד" => horror or scary movies
+- "מותחן" / "מתח" => thriller or suspense movies
+- "מצחיק" / "קומדיה" => comedy movies
+- "ים" / "חוף" => sea, ocean, beach, island, water related posts
 
-CHECK B — Movie-identity reasoning (second priority):
-  1. Identify the movie or franchise discussed in the post.
-     Translate the post title if needed to find the real English title.
-     Reference examples (do not limit to these):
-       "מהיר ועצבני" / "הובס ושאו" → Fast & Furious franchise (PG-13, action, adults)
-       "מואנה" → Moana (G, animation, children/family)
-       "צעצוע של סיפור" → Toy Story (G, animation, children/family)
-       "הג׳וקר" / "ג׳וקר" → Joker (R, dark thriller/drama, adults)
-       "הניצוץ" → The Shining (R, horror, adults)
-       "קפוא" / "פרוזן" → Frozen (G, animation, children/family)
-       "שרק" → Shrek (PG, animation, family)
-       "לבד בבית" → Home Alone (PG, comedy, family)
-  2. Using your training knowledge of that identified movie, recall:
-     - Genre(s)
-     - MPAA rating (G / PG / PG-13 / R)
-     - Target audience: children (3–10) / family (all ages) / teens / adults
-     - Tone, themes, main cast
-  3. Does the identified movie's genre / audience / tone match the query intent?
-     If YES and confidently → include.
-     If uncertain or only partial match → exclude.
+Rules:
+1. Include exact text matches.
+2. Include posts where the movie identity clearly matches the user intent.
+3. Include strong synonym/semantic matches.
+4. If a post is clearly unrelated, exclude it.
+5. Prefer accurate results over many weak results.
 
-CHECK C — Cast / crew match:
-  If the query mentions a person's name (e.g., "סינדי סוויני" = Sydney Sweeney):
-  1. Recall the movies that person is known for.
-  2. Check if any post discusses one of those movies → include.
-
-CHECK D — Sentiment match:
-  If the query asks about bad reviews / negative reactions / "תגובות שליליות":
-  → Inspect sampleComments for criticism or disappointment.
-  → Very low likesCount relative to commentsCount is also a signal.
-
-━━━ STEP 3 — Filter and rank ━━━
-Priority order: CHECK A > CHECK B > CHECK C > CHECK D.
-Hard genre rules based on actual movie knowledge — not on words in the post:
-  * "kids" / "ילדים" / "family" → ONLY G or PG children's/family films. NEVER Fast & Furious (PG-13), NEVER Joker (R).
-  * "action" / "אקשן" / "פעולה" → action-genre films only. Not animation, not romance.
-  * "horror" / "אימה" / "מפחיד" → horror or dark psychological thriller only. Never Disney or family films.
-Exclude any post where the match is weak, coincidental, or uncertain.
-Prefer 2–5 high-confidence results.
-Zero results is the correct answer when nothing truly fits.
-
-━━━ POSTS ━━━
+POSTS:
 ${JSON.stringify(compactPosts)}
 
-━━━ OUTPUT ━━━
-Return ONLY valid JSON. No markdown. No code fences. No text outside the JSON.
-
-Format when results exist:
-{"matchedPostIds":["<id>"],"reasoningSummary":"<one sentence>","queryUnderstanding":{"language":"<detected>","intent":"<English intent>","genres":["<genre>"],"audience":["<audience>"],"sentiment":"positive|negative|neutral|any"}}
-
-Format when nothing matches or confidence is low:
-{"matchedPostIds":[],"reasoningSummary":"No posts confidently match this query","queryUnderstanding":{"language":"<detected>","intent":"<English intent>","genres":[],"audience":[],"sentiment":"any"}}`;
+Return ONLY valid JSON:
+{
+  "matchedPostIds": ["id1","id2"],
+  "reasoningSummary": "short explanation",
+  "queryUnderstanding": {
+    "language": "",
+    "intent": "",
+    "genres": [],
+    "audience": [],
+    "sentiment": "any"
+  }
+}
+`;
 
       const result = await model.generateContent(prompt);
       const raw = stripCodeFences(result.response.text().trim());
+      console.log("🤖 GEMINI RAW:", raw);
+
       const parsed = JSON.parse(raw) as GeminiSemanticResponse;
 
-      if (
-        parsed &&
-        Array.isArray(parsed.matchedPostIds) &&
-        parsed.queryUnderstanding &&
-        Array.isArray(parsed.queryUnderstanding.genres) &&
-        Array.isArray(parsed.queryUnderstanding.audience)
-      ) {
+      if (parsed && Array.isArray(parsed.matchedPostIds)) {
         const validIds = new Set(allPostIds);
         matchedIds = parsed.matchedPostIds.filter((id) => validIds.has(id));
-        queryUnderstanding = parsed.queryUnderstanding;
+        queryUnderstanding = parsed.queryUnderstanding ?? queryUnderstanding;
         aiSucceeded = true;
       }
-    } catch {
-      // fall through to regex fallback
+    } catch (err) {
+      console.error("❌ GEMINI ERROR:", err);
     }
   }
 
-  // 4. Fetch full posts — AI results or regex fallback
-  const posts = aiSucceeded
-    ? await Post.find({ _id: { $in: matchedIds } })
-        .populate("author", "username email profileImage")
-        .sort({ createdAt: -1 })
-    : await Post.find(buildRegexFallback(trimmedQuery))
-        .populate("author", "username email profileImage")
-        .sort({ createdAt: -1 });
+  // 4. Fetch posts — combine AI results + regular text search
+  const aiPosts =
+    aiSucceeded && matchedIds.length > 0
+      ? await Post.find({ _id: { $in: matchedIds } })
+          .populate("author", "username email profileImage")
+          .sort({ createdAt: -1 })
+      : [];
 
-  // 5. Add liked flag
+  const fallbackPosts = await Post.find(buildRegexFallback(trimmedQuery))
+    .populate("author", "username email profileImage")
+    .sort({ createdAt: -1 });
+
+  const posts = Array.from(
+    new Map(
+      [...aiPosts, ...fallbackPosts].map((post) => [
+        post._id.toString(),
+        post,
+      ])
+    ).values()
+  );
+
   const likedSet = new Set<string>();
+
   if (posts.length > 0) {
     const pids = posts.map((p) => p._id);
     const likes = await Like.find({ userId, postId: { $in: pids } }).select("postId");
@@ -226,7 +201,6 @@ Format when nothing matches or confidence is low:
     liked: likedSet.has(p._id.toString()),
   }));
 
-  // Map to the frontend AiSearchQuery shape (genres/titles/themes/moods/keywords)
   res.status(200).json({
     results,
     query: {
