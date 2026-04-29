@@ -347,6 +347,32 @@ export async function deletePost(id: string): Promise<boolean> {
   }
 }
 
+export type AiSearchQuery = {
+  genres: string[];
+  titles: string[];
+  themes: string[];
+  moods: string[];
+  keywords: string[];
+};
+
+export type AiSearchResult = {
+  results: Post[];
+  query: AiSearchQuery;
+};
+
+/**
+ * POST /api/ai/search
+ * Natural language search using Gemini.
+ */
+export async function searchPostsWithAI(userQuery: string): Promise<AiSearchResult> {
+  const response = await api.post("/ai/search", { query: userQuery });
+  const { results, query } = response.data as { results: BackendPost[]; query: AiSearchQuery };
+  return {
+    results: results.map((p) => mapBackendPost(p)),
+    query,
+  };
+}
+
 /**
  * POST /posts/:id/like
  * Toggles the liked state and updates the like count.

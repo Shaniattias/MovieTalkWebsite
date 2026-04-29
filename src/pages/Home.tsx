@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Plus, Heart, MessageCircle, UserRound } from "lucide-react";
+import { Search, Plus, Heart, MessageCircle, UserRound, Sparkles, X, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { fetchFeedPosts, toggleLike, type Post } from "../lib/posts";
+import { fetchFeedPosts, toggleLike, searchPostsWithAI, type Post } from "../lib/posts";
 
 export default function Home() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [query, setQuery] = useState("");
   const [posts, setPosts] = useState<Post[]>([]);
+  const [aiResults, setAiResults] = useState<Post[] | null>(null);
+  const [aiSearching, setAiSearching] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -23,6 +25,24 @@ export default function Home() {
     } catch {
       // keep existing UI state on failure
     }
+  };
+
+  const handleAiSearch = async () => {
+    const q = query.trim();
+    if (!q) return;
+    setAiSearching(true);
+    try {
+      const { results } = await searchPostsWithAI(q);
+      setAiResults(results);
+    } catch {
+      // silently fall back to local filter
+    } finally {
+      setAiSearching(false);
+    }
+  };
+
+  const clearAiSearch = () => {
+    setAiResults(null);
   };
 
   const filtered = useMemo(() => {
@@ -60,13 +80,22 @@ export default function Home() {
             </div>
 
             <div className="absolute left-1/2 top-1/2 z-0 flex w-[min(44vw,420px)] min-w-[170px] -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-3 py-2 backdrop-blur">
-              <Search className="h-4 w-4 opacity-80" />
+              {aiResults !== null
+                ? <Sparkles className="h-4 w-4 text-purple-400 shrink-0" />
+                : <Search className="h-4 w-4 opacity-80 shrink-0" />}
               <input
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search posts, users, topics..."
+                onChange={(e) => { setQuery(e.target.value); if (aiResults) clearAiSearch(); }}
+                onKeyDown={(e) => { if (e.key === "Enter") handleAiSearch(); }}
+                placeholder="Search with AI… press Enter"
                 className="w-full bg-transparent outline-none placeholder:text-white/60 text-sm"
               />
+              {aiSearching && <Loader2 className="h-4 w-4 animate-spin opacity-60 shrink-0" />}
+              {aiResults !== null && !aiSearching && (
+                <button onClick={clearAiSearch} aria-label="Clear AI search">
+                  <X className="h-4 w-4 opacity-60 hover:opacity-100 shrink-0" />
+                </button>
+              )}
             </div>
 
             <div className="z-10 flex items-center justify-end gap-2">
@@ -92,9 +121,9 @@ export default function Home() {
         <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
           <div className="mx-auto w-full">
             <section className="space-y-6">
-            
 
-              {filtered.map((p) => (
+
+              {(aiResults ?? filtered).map((p) => (
                 <article
                   key={p.id}
                   onClick={() => navigate(`/post/${p.id}`)}
@@ -173,7 +202,7 @@ export default function Home() {
                   </div>
                 </article>
               ))}
-              {filtered.length === 0 ? (
+              {(aiResults ?? filtered).length === 0 ? (
                 <div className="rounded-3xl border border-white/15 bg-white/10 p-10 text-center backdrop-blur-xl">
                   <p className="text-lg font-semibold">No posts found</p>
                   <p className="mt-2 text-sm text-white/70">
