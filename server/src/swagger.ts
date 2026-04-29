@@ -11,7 +11,8 @@ const options = {
     },
     servers: [
       {
-        url: 'http://localhost:5001/api',
+        url: 'https://node45.cs.colman.ac.il/api',
+        description: 'College server',
       },
     ],
     components: {
@@ -29,7 +30,7 @@ const options = {
       },
     ],
   },
-  apis: ['./src/routes/*.ts'], // paths to files containing OpenAPI definitions
+  apis: ['./src/routes/*.ts'],
 };
 
 const swaggerSpec = swaggerJSDoc(options);
