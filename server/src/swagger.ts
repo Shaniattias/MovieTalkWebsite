@@ -1,7 +1,9 @@
+import path from 'path';
 import swaggerJSDoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
+import type { Options } from 'swagger-jsdoc';
 
-const options = {
+const options: Options = {
   definition: {
     openapi: '3.0.0',
     info: {
@@ -29,7 +31,11 @@ const options = {
       },
     ],
   },
-  apis: ['./src/routes/*.ts'], // paths to files containing OpenAPI definitions
+  // Works in both dev (src/*.ts via ts-node-dev) and prod (dist/*.js after tsc build)
+  apis: [
+    path.join(__dirname, 'routes', '*.ts'),
+    path.join(__dirname, 'routes', '*.js'),
+  ],
 };
 
 const swaggerSpec = swaggerJSDoc(options);
