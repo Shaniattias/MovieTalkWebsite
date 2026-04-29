@@ -14,7 +14,10 @@ app.use(cors({
   origin: process.env.CLIENT_URL || "http://localhost:5173",
   credentials: true,
 }));
-app.use(express.json());
+
+// Configure payload size limits for file uploads
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(cookieParser());
 
 app.use("/uploads", express.static("uploads"));
@@ -28,10 +31,15 @@ app.use("/api/comments", commentRoutes);
 app.use("/api/likes", likeRoutes);
 app.use("/api/ai", aiRoutes);
 
+// Error handling middleware for file uploads and other errors
 app.use((err: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (err instanceof multer.MulterError) {
     if (err.code === "LIMIT_FILE_SIZE") {
-      res.status(400).json({ message: "Image is too large. Max size is 5MB." });
+      res.status(413).json({ message: "Image is too large. Max size is 10MB." });
+      return;
+    }
+    if (err.code === "LIMIT_PART_COUNT") {
+      res.status(400).json({ message: "Too many file parts." });
       return;
     }
     res.status(400).json({ message: err.message });

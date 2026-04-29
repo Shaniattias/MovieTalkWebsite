@@ -46,7 +46,11 @@ const fileFilter = (
   }
 };
 
-const UPLOAD_LIMITS = { fileSize: 5 * 1024 * 1024 };
+// File size limit set to 10MB for safe, scalable uploads
+const UPLOAD_LIMITS = { 
+  fileSize: 10 * 1024 * 1024, // 10MB
+  files: 1, // Only allow single file upload per request
+};
 
 export const uploadProfileImage = multer({
   storage: imageStorageProfile,
