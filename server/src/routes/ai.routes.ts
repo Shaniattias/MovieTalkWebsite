@@ -93,65 +93,83 @@ router.post("/search", authMiddleware, async (req: Request, res: Response): Prom
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-      const prompt = `You are an expert multilingual search assistant for a movie discussion platform.
+      const prompt = `You are an expert multilingual movie search assistant for a movie discussion platform.
+You have deep knowledge of movies, franchises, actors, directors, genres, and audiences.
 
 User query: "${trimmedQuery}"
 
-Follow these steps in order before producing any output.
+Complete ALL three steps below before producing output.
 
-━━━ STEP 1 — Understand and expand the query ━━━
+━━━ STEP 1 — Understand the query ━━━
 a) Detect the query language (Hebrew, English, Arabic, etc.).
-b) Translate the query mentally to English for reasoning. Do not output this translation.
-c) Extract all key terms from the query.
-d) For each key term, generate synonyms and closely related words in BOTH the original language AND English. Examples:
-   - "ים" → sea, ocean, beach, waves, shore, חוף, אוקיינוס, גלים
-   - "אימה" / "מפחיד" → horror, scary, frightening, terrifying, thriller, suspense, dark
-   - "מצחיק" → comedy, funny, humor, hilarious, laugh, קומדיה
-   - "רומנטי" / "אהבה" → romance, love, romantic, relationship, affection
-   - "פעולה" → action, fight, explosions, chase, battle, combat
-   - "ילדים" / "משפחה" → kids, children, family, animated, animation, Disney, Pixar
-   - "עצוב" → sad, emotional, tearful, dramatic, heartbreaking
-   - "מותח" → thriller, suspense, tense, gripping, mystery
-e) Build two sets you will use in Step 2:
-   - EXACT_TERMS: the original query words exactly as written by the user
-   - SEMANTIC_TERMS: all synonyms and related words you generated above
+b) Translate it mentally to English. Do not output the translation.
+c) Determine what the user is looking for. It may be one or more of:
+   - Genre: action / horror / comedy / romance / animation / thriller / sci-fi / drama
+   - Audience: kids / family / teens / adults
+   - Mood / tone: funny / scary / emotional / dark / uplifting / suspenseful
+   - Cast or crew: a specific actor or director name
+   - Sentiment: posts with positive or negative community reactions
+   - A specific concept or theme (sea, friendship, revenge, etc.)
+d) Build these two sets for use in Step 2:
+   EXACT_TERMS — the user's words exactly as typed
+   SYNONYM_TERMS — related words in both the query language and English. Examples:
+     "ילדים" / "kids" → children, family, animated, animation, Disney, Pixar, G-rated, PG
+     "אימה" / "horror" → scary, frightening, thriller, psychological, dark, terrifying
+     "אקשן" / "action" → fight, chase, explosion, combat, stunt, PG-13, mission
+     "מצחיק" / "funny" → comedy, humor, hilarious, laugh, witty
+     "רומנטי" / "romance" → love, relationship, affection, romantic comedy
+     "מותח" / "thriller" → suspense, tense, mystery, gripping, psychological
+     "עצוב" / "sad" → emotional, drama, tearful, heartbreaking
+     "ים" / "sea" → ocean, beach, water, waves, shore, island
 
-━━━ STEP 2 — Analyze each post ━━━
-For each post, examine ALL available text: title, text, and sampleComments.
+━━━ STEP 2 — Analyze each post with THREE checks ━━━
+For each post examine ALL text fields: title, text, sampleComments.
 
-A) EXACT MATCH — check first, highest priority:
-   Scan title + text + sampleComments for any word from EXACT_TERMS (case-insensitive, ignore punctuation).
-   If ANY exact term appears verbatim → this post is a strong candidate, include it.
-   Example: if the user searched "סרט חכם מאוד" and a comment contains exactly "סרט חכם מאוד" → include.
+CHECK A — Exact text match (highest priority):
+  Scan title + text + sampleComments for any word from EXACT_TERMS (case-insensitive).
+  If ANY exact term appears verbatim → strong match, include it.
+  Example: query "סרט חכם מאוד", comment says "סרט חכם מאוד" → include.
 
-B) SEMANTIC MATCH — check second:
-   1. Identify the movie being discussed in the post. If the title is in Hebrew or another language, translate it mentally to the English movie name.
-      (e.g., "מהיר ועצבני" = Fast & Furious | "מואנה" = Moana | "הג'וקר" = Joker)
-   2. Using your training knowledge about that movie, recall its genre, audience, tone, cast, and themes.
-   3. Does the post content or the movie itself relate to the SEMANTIC_TERMS or the query intent?
-      - If the connection is strong and confident → include.
-      - If the connection is weak, partial, or uncertain → exclude.
+CHECK B — Movie-identity reasoning (second priority):
+  1. Identify the movie or franchise discussed in the post.
+     Translate the post title if needed to find the real English title.
+     Reference examples (do not limit to these):
+       "מהיר ועצבני" / "הובס ושאו" → Fast & Furious franchise (PG-13, action, adults)
+       "מואנה" → Moana (G, animation, children/family)
+       "צעצוע של סיפור" → Toy Story (G, animation, children/family)
+       "הג׳וקר" / "ג׳וקר" → Joker (R, dark thriller/drama, adults)
+       "הניצוץ" → The Shining (R, horror, adults)
+       "קפוא" / "פרוזן" → Frozen (G, animation, children/family)
+       "שרק" → Shrek (PG, animation, family)
+       "לבד בבית" → Home Alone (PG, comedy, family)
+  2. Using your training knowledge of that identified movie, recall:
+     - Genre(s)
+     - MPAA rating (G / PG / PG-13 / R)
+     - Target audience: children (3–10) / family (all ages) / teens / adults
+     - Tone, themes, main cast
+  3. Does the identified movie's genre / audience / tone match the query intent?
+     If YES and confidently → include.
+     If uncertain or only partial match → exclude.
 
-C) CAST / CREW MATCH — for queries that mention a person's name:
-   1. Identify who the user is searching for (e.g., "סינדי סוויני" = Sydney Sweeney).
-   2. Recall all movies that person is known for from your training data.
-   3. Check if any post discusses one of those movies → include those posts.
+CHECK C — Cast / crew match:
+  If the query mentions a person's name (e.g., "סינדי סוויני" = Sydney Sweeney):
+  1. Recall the movies that person is known for.
+  2. Check if any post discusses one of those movies → include.
 
-D) SENTIMENT MATCH — for queries about reactions or reviews:
-   If the query asks for "bad reviews", "תגובות שליליות", "movies people hated", etc.:
-   → Check sampleComments for criticism, disappointment, or negativity.
-   → Also consider very low likesCount relative to commentsCount as a signal.
+CHECK D — Sentiment match:
+  If the query asks about bad reviews / negative reactions / "תגובות שליליות":
+  → Inspect sampleComments for criticism or disappointment.
+  → Very low likesCount relative to commentsCount is also a signal.
 
-━━━ STEP 3 — Rank and filter ━━━
-- EXACT matches have highest priority — always include them if found.
-- Strong SEMANTIC matches come second.
-- Exclude posts with only a weak or coincidental connection.
-- Non-negotiable genre rules (based on actual movie knowledge, not post text):
-  * "kids" / "ילדים" / "family" → ONLY G or PG rated children's/family films. Never Fast & Furious, Joker, or R-rated films.
-  * "action" / "אקשן" → PG-13 or above action films. Not animation, not romance.
-  * "horror" / "scary" / "אימה" → horror or dark thriller. Never Disney/family films.
-- Prefer 2–5 accurate results over many weak ones.
-- Returning zero results is correct and preferred over returning wrong results.
+━━━ STEP 3 — Filter and rank ━━━
+Priority order: CHECK A > CHECK B > CHECK C > CHECK D.
+Hard genre rules based on actual movie knowledge — not on words in the post:
+  * "kids" / "ילדים" / "family" → ONLY G or PG children's/family films. NEVER Fast & Furious (PG-13), NEVER Joker (R).
+  * "action" / "אקשן" / "פעולה" → action-genre films only. Not animation, not romance.
+  * "horror" / "אימה" / "מפחיד" → horror or dark psychological thriller only. Never Disney or family films.
+Exclude any post where the match is weak, coincidental, or uncertain.
+Prefer 2–5 high-confidence results.
+Zero results is the correct answer when nothing truly fits.
 
 ━━━ POSTS ━━━
 ${JSON.stringify(compactPosts)}
