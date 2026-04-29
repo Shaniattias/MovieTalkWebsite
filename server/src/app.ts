@@ -7,6 +7,8 @@ import authRoutes from "./routes/auth.routes";
 import postRoutes from "./routes/post.routes";
 import commentRoutes from "./routes/comment.routes";
 import likeRoutes from "./routes/like.routes";
+import aiRoutes from "./routes/ai.routes";
+import { swaggerUi, swaggerSpec } from "./swagger";
 
 const app = express();
 
