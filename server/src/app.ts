@@ -7,7 +7,6 @@ import authRoutes from "./routes/auth.routes";
 import postRoutes from "./routes/post.routes";
 import commentRoutes from "./routes/comment.routes";
 import likeRoutes from "./routes/like.routes";
-import aiRoutes from "./routes/ai.routes";
 
 const app = express();
 
@@ -20,6 +19,8 @@ app.use(cookieParser());
 
 app.use("/uploads", express.static("uploads"));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/posts", postRoutes);
